@@ -38,6 +38,9 @@ static void *ngx_http_ssl_ct_create_srv_conf(ngx_conf_t *cf);
 static char *ngx_http_ssl_ct_merge_srv_conf(ngx_conf_t *cf, void *parent, void *child);
 static int ngx_http_ssl_ct_ext_cb(SSL *s, unsigned int ext_type,
     const unsigned char **out, size_t *outlen, int *al, void *add_arg);
+static ngx_http_ssl_ct_ext *ngx_http_ssl_ct_read_static_sct(ngx_conf_t *cf,
+    ngx_str_t *dir, u_char *file, size_t file_len,
+    ngx_http_ssl_ct_ext *sct_list);
 static ngx_http_ssl_ct_ext *ngx_http_ssl_ct_read_static_scts(ngx_conf_t *cf, ngx_str_t *path);
 
 static ngx_http_module_t ngx_http_ssl_ct_module_ctx = {
