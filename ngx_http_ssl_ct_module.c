@@ -137,15 +137,23 @@ static char *ngx_http_ssl_ct_merge_srv_conf(ngx_conf_t *cf, void *parent,
         return NGX_CONF_OK;
     }
 
+    ngx_http_ssl_srv_conf_t *ssl_conf = ngx_http_conf_get_module_srv_conf(cf,
+        ngx_http_ssl_module);
+
+    if (!ssl_conf->enable)
+    {
+        ngx_log_error(NGX_LOG_EMERG, cf->log, 0,
+            "\"ssl_ct\" can only be enabled if ssl is enabled");
+        return NGX_CONF_ERROR;
+    }
+
     ngx_http_ssl_ct_ext *sct_list = ngx_http_ssl_ct_read_static_scts(cf,
         &conf->sct);
     if (!sct_list)
     {
+        /* ngx_http_ct_read_static_scts calls ngx_log_error */
         return NGX_CONF_ERROR;
     }
-
-    ngx_http_ssl_srv_conf_t *ssl_conf = ngx_http_conf_get_module_srv_conf(cf,
-        ngx_http_ssl_module);
 
     if (SSL_CTX_add_server_custom_ext(ssl_conf->ssl.ctx, NGX_HTTP_SSL_CT_EXT,
         &ngx_http_ssl_ct_ext_cb, NULL, sct_list, NULL, NULL) == 0)
