@@ -35,13 +35,15 @@ typedef struct
 } ngx_http_ssl_ct_ext;
 
 static void *ngx_http_ssl_ct_create_srv_conf(ngx_conf_t *cf);
-static char *ngx_http_ssl_ct_merge_srv_conf(ngx_conf_t *cf, void *parent, void *child);
+static char *ngx_http_ssl_ct_merge_srv_conf(ngx_conf_t *cf, void *parent,
+    void *child);
 static int ngx_http_ssl_ct_ext_cb(SSL *s, unsigned int ext_type,
     const unsigned char **out, size_t *outlen, int *al, void *add_arg);
 static ngx_http_ssl_ct_ext *ngx_http_ssl_ct_read_static_sct(ngx_conf_t *cf,
     ngx_str_t *dir, u_char *file, size_t file_len,
     ngx_http_ssl_ct_ext *sct_list);
-static ngx_http_ssl_ct_ext *ngx_http_ssl_ct_read_static_scts(ngx_conf_t *cf, ngx_str_t *path);
+static ngx_http_ssl_ct_ext *ngx_http_ssl_ct_read_static_scts(ngx_conf_t *cf,
+    ngx_str_t *path);
 
 static ngx_http_module_t ngx_http_ssl_ct_module_ctx = {
     NULL,                             /* preconfiguration */
@@ -111,7 +113,8 @@ static void *ngx_http_ssl_ct_create_srv_conf(ngx_conf_t *cf)
     return conf;
 }
 
-static char *ngx_http_ssl_ct_merge_srv_conf(ngx_conf_t *cf, void *parent, void *child)
+static char *ngx_http_ssl_ct_merge_srv_conf(ngx_conf_t *cf, void *parent,
+    void *child)
 {
     ngx_http_ssl_ct_srv_conf_t *prev = parent;
     ngx_http_ssl_ct_srv_conf_t *conf = child;
@@ -124,7 +127,8 @@ static char *ngx_http_ssl_ct_merge_srv_conf(ngx_conf_t *cf, void *parent, void *
         if (conf->sct.len == 0)
         {
             ngx_log_error(NGX_LOG_EMERG, cf->log, 0,
-                "no \"ssl_ct_static_scts\" is defined for the \"ssl_ct\" directive");
+                "no \"ssl_ct_static_scts\" is defined for the \"ssl_ct\""
+                "directive");
             return NGX_CONF_ERROR;
         }
     }
@@ -133,13 +137,15 @@ static char *ngx_http_ssl_ct_merge_srv_conf(ngx_conf_t *cf, void *parent, void *
         return NGX_CONF_OK;
     }
 
-    ngx_http_ssl_ct_ext *sct_list = ngx_http_ssl_ct_read_static_scts(cf, &conf->sct);
+    ngx_http_ssl_ct_ext *sct_list = ngx_http_ssl_ct_read_static_scts(cf,
+        &conf->sct);
     if (!sct_list)
     {
         return NGX_CONF_ERROR;
     }
 
-    ngx_http_ssl_srv_conf_t *ssl_conf = ngx_http_conf_get_module_srv_conf(cf, ngx_http_ssl_module);
+    ngx_http_ssl_srv_conf_t *ssl_conf = ngx_http_conf_get_module_srv_conf(cf,
+        ngx_http_ssl_module);
 
     if (SSL_CTX_add_server_custom_ext(ssl_conf->ssl.ctx, NGX_HTTP_SSL_CT_EXT,
         &ngx_http_ssl_ct_ext_cb, NULL, sct_list, NULL, NULL) == 0)
@@ -162,7 +168,9 @@ static int ngx_http_ssl_ct_ext_cb(SSL *s, unsigned int ext_type,
     return 1;
 }
 
-static ngx_http_ssl_ct_ext *ngx_http_ssl_ct_read_static_sct(ngx_conf_t *cf, ngx_str_t *dir, u_char *file, size_t file_len, ngx_http_ssl_ct_ext *sct_list)
+static ngx_http_ssl_ct_ext *ngx_http_ssl_ct_read_static_sct(ngx_conf_t *cf,
+    ngx_str_t *dir, u_char *file, size_t file_len,
+    ngx_http_ssl_ct_ext *sct_list)
 {
     /* reserve two bytes for the length */
     size_t len_pos = sct_list->len;
@@ -272,7 +280,8 @@ static ngx_http_ssl_ct_ext *ngx_http_ssl_ct_read_static_sct(ngx_conf_t *cf, ngx_
     return sct_list;
 }
 
-static ngx_http_ssl_ct_ext *ngx_http_ssl_ct_read_static_scts(ngx_conf_t *cf, ngx_str_t *path)
+static ngx_http_ssl_ct_ext *ngx_http_ssl_ct_read_static_scts(ngx_conf_t *cf,
+    ngx_str_t *path)
 {
     /* allocate sct_list structure */
     ngx_http_ssl_ct_ext *sct_list = ngx_pcalloc(cf->pool, sizeof(*sct_list));
@@ -331,7 +340,8 @@ static ngx_http_ssl_ct_ext *ngx_http_ssl_ct_read_static_scts(ngx_conf_t *cf, ngx
         }
 
         /* add the .sct file to the sct_list */
-        if (!ngx_http_ssl_ct_read_static_sct(cf, path, file, file_len, sct_list))
+        if (!ngx_http_ssl_ct_read_static_sct(cf, path, file, file_len,
+            sct_list))
         {
             /* ngx_http_ssl_ct_read_static_sct calls ngx_log_error */
             ngx_pfree(cf->pool, sct_list);
