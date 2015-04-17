@@ -116,12 +116,14 @@ static void *ngx_http_ssl_ct_create_srv_conf(ngx_conf_t *cf)
 static char *ngx_http_ssl_ct_merge_srv_conf(ngx_conf_t *cf, void *parent,
     void *child)
 {
+    /* merge config */
     ngx_http_ssl_ct_srv_conf_t *prev = parent;
     ngx_http_ssl_ct_srv_conf_t *conf = child;
 
     ngx_conf_merge_value(conf->enable, prev->enable, 0);
     ngx_conf_merge_str_value(conf->sct, prev->sct, "");
 
+    /* validate config */
     if (conf->enable)
     {
         if (conf->sct.len == 0)
@@ -137,6 +139,7 @@ static char *ngx_http_ssl_ct_merge_srv_conf(ngx_conf_t *cf, void *parent,
         return NGX_CONF_OK;
     }
 
+    /* get ngx_http_ssl_module configuration and check if SSL is enabled */
     ngx_http_ssl_srv_conf_t *ssl_conf = ngx_http_conf_get_module_srv_conf(cf,
         ngx_http_ssl_module);
 
@@ -147,6 +150,7 @@ static char *ngx_http_ssl_ct_merge_srv_conf(ngx_conf_t *cf, void *parent,
         return NGX_CONF_ERROR;
     }
 
+    /* read .sct files */
     ngx_http_ssl_ct_ext *sct_list = ngx_http_ssl_ct_read_static_scts(cf,
         &conf->sct);
     if (!sct_list)
@@ -155,6 +159,7 @@ static char *ngx_http_ssl_ct_merge_srv_conf(ngx_conf_t *cf, void *parent,
         return NGX_CONF_ERROR;
     }
 
+    /* add OpenSSL TLS extension */
     if (SSL_CTX_add_server_custom_ext(ssl_conf->ssl.ctx, NGX_HTTP_SSL_CT_EXT,
         &ngx_http_ssl_ct_ext_cb, NULL, sct_list, NULL, NULL) == 0)
     {
