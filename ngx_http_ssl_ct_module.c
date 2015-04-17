@@ -147,7 +147,7 @@ static char *ngx_http_ssl_ct_merge_srv_conf(ngx_conf_t *cf, void *parent,
     ngx_http_ssl_srv_conf_t *ssl_conf = ngx_http_conf_get_module_srv_conf(cf,
         ngx_http_ssl_module);
 
-    if (!ssl_conf->enable)
+    if (!ssl_conf->ssl.ctx)
     {
         ngx_log_error(NGX_LOG_EMERG, cf->log, 0,
             "\"ssl_ct\" can only be enabled if ssl is enabled");
