@@ -19,7 +19,7 @@
 #include <ngx_http.h>
 
 #ifndef NGX_HTTP_SSL
-#error ngx_http_ssl_ct_module requires ngx_http_ssl_module to be enabled
+#error ngx_http_ssl_ct_module requires the ngx_http_ssl_module to be enabled
 #else
 
 #define NGX_HTTP_SSL_CT_EXT 18 /* from RFC 6962 */
