@@ -225,7 +225,7 @@ static ngx_http_ssl_ct_ext *ngx_http_ssl_ct_read_static_sct(ngx_conf_t *cf,
     ngx_file_info_t stat;
     if (ngx_fd_info(fd, &stat) == NGX_FILE_ERROR)
     {
-        ngx_log_error(NGX_LOG_EMERG, cf->log, 0,
+        ngx_log_error(NGX_LOG_EMERG, cf->log, ngx_errno,
             ngx_fd_info_n " \"%s\" failed", path);
 
         if (ngx_close_file(fd) != NGX_OK)
