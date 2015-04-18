@@ -47,4 +47,4 @@ information and licensing terms.
 [apache]: https://httpd.apache.org/docs/trunk/mod/mod_ssl_ct.html
 [submit-cert]: https://github.com/tomrittervg/ct-tools/blob/master/submit-cert.py
 [write-sct]: https://github.com/tomrittervg/ct-tools/blob/master/write-sct.py
-[blog]: https://github.com/tomrittervg/ct-tools/blob/master/write-sct.py
+[blog]: https://ritter.vg/blog-require_certificate_transparency.html
