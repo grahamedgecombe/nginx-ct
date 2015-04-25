@@ -31,9 +31,9 @@ expected to be encoded in binary (see the definition of
 `SignedCertificateTimestamp` struct in [section 3.2 of RFC 6962][rfc]). This is
 the same format used by Apache's [mod\_ssl\_ct][apache] module.
 
-Tom Ritter wrote some Python scripts for [submitting certificates][submit-cert]
-to log servers and [encoding SCTs][write-sct], along with a [blog post][blog]
-explaining how to use them.
+[ct-submit][ct-submit] can be used to submit certificates to log servers and
+encode the `SignedCertificateTimestamp` struct in the appropriate format for use
+with this module.
 
 License
 -------
@@ -45,6 +45,4 @@ information and licensing terms.
 [ct]: http://www.certificate-transparency.org/
 [rfc]: https://tools.ietf.org/html/rfc6962#section-3.2
 [apache]: https://httpd.apache.org/docs/trunk/mod/mod_ssl_ct.html
-[submit-cert]: https://github.com/tomrittervg/ct-tools/blob/master/submit-cert.py
-[write-sct]: https://github.com/tomrittervg/ct-tools/blob/master/write-sct.py
-[blog]: https://ritter.vg/blog-require_certificate_transparency.html
+[ct-submit]: https://github.com/grahamedgecombe/ct-submit
