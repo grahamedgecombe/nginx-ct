@@ -323,13 +323,11 @@ static ngx_http_ssl_ct_ext *ngx_http_ssl_ct_read_static_scts(ngx_conf_t *cf,
     /* iterate through all files */
     for (;;)
     {
-        ngx_err_t err;
-
         ngx_set_errno(NGX_ENOMOREFILES);
 
         if (ngx_read_dir(&dir) != NGX_OK)
         {
-            err = ngx_errno;
+            ngx_err_t err = ngx_errno;
 
             if (err == NGX_ENOMOREFILES)
             {
