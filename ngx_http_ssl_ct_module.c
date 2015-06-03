@@ -324,6 +324,9 @@ static ngx_http_ssl_ct_ext *ngx_http_ssl_ct_read_static_scts(ngx_conf_t *cf,
     for (;;)
     {
         ngx_err_t err;
+
+        ngx_set_errno(0);
+
         if (ngx_read_dir(&dir) != NGX_OK)
         {
             err = ngx_errno;
