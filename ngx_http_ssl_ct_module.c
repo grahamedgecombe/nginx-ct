@@ -304,7 +304,7 @@ static ngx_http_ssl_ct_ext *ngx_http_ssl_ct_read_static_scts(ngx_conf_t *cf,
     if (ngx_conf_full_name(cf->cycle, path, 1) != NGX_OK)
     {
         ngx_log_error(NGX_LOG_EMERG, cf->log, ngx_errno,
-            "ngx_conf_full_name \"%V\" failed", path);
+            "ngx_conf_full_name \"%V\" failed");
         return NULL;
     }
 
