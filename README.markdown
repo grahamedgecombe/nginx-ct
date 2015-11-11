@@ -17,6 +17,9 @@ nginx must be compiled with OpenSSL support or it will fail to build. OpenSSL
 1.0.2 or above is required, as the module makes use of the new
 `SSL_CTX_add_server_custom_ext` function.
 
+LibreSSL is not supported as it doesn't have support for the
+`SSL_CTX_add_server_custom_ext` function.
+
 Configuration
 -------------
 
