@@ -41,8 +41,10 @@ typedef struct
 static void *ngx_http_ssl_ct_create_srv_conf(ngx_conf_t *cf);
 static char *ngx_http_ssl_ct_merge_srv_conf(ngx_conf_t *cf, void *parent,
     void *child);
+#ifndef OPENSSL_IS_BORINGSSL
 static int ngx_http_ssl_ct_ext_cb(SSL *s, unsigned int ext_type,
     const unsigned char **out, size_t *outlen, int *al, void *add_arg);
+#endif
 static ngx_http_ssl_ct_ext *ngx_http_ssl_ct_read_static_sct(ngx_conf_t *cf,
     ngx_str_t *dir, u_char *file, size_t file_len,
     ngx_http_ssl_ct_ext *sct_list);
@@ -164,6 +166,7 @@ static char *ngx_http_ssl_ct_merge_srv_conf(ngx_conf_t *cf, void *parent,
     }
 
     /* add OpenSSL TLS extension */
+#ifndef OPENSSL_IS_BORINGSSL
     if (SSL_CTX_add_server_custom_ext(ssl_conf->ssl.ctx, NGX_HTTP_SSL_CT_EXT,
         &ngx_http_ssl_ct_ext_cb, NULL, sct_list, NULL, NULL) == 0)
     {
@@ -172,10 +175,21 @@ static char *ngx_http_ssl_ct_merge_srv_conf(ngx_conf_t *cf, void *parent,
         ngx_pfree(cf->pool, sct_list);
         return NGX_CONF_ERROR;
     }
+#else
+    if (SSL_CTX_set_signed_cert_timestamp_list(ssl_conf->ssl.ctx, sct_list->buf,
+        sct_list->len) == 0)
+    {
+        ngx_log_error(NGX_LOG_EMERG, cf->log, 0,
+            "SSL_CTX_set_signed_cert_timestamp_list failed");
+        ngx_pfree(cf->pool, sct_list);
+        return NGX_CONF_ERROR;
+    }
+#endif
 
     return NGX_CONF_OK;
 }
 
+#ifndef OPENSSL_IS_BORINGSSL
 static int ngx_http_ssl_ct_ext_cb(SSL *s, unsigned int ext_type,
     const unsigned char **out, size_t *outlen, int *al, void *add_arg)
 {
@@ -184,6 +198,7 @@ static int ngx_http_ssl_ct_ext_cb(SSL *s, unsigned int ext_type,
     *outlen = sct_list->len;
     return 1;
 }
+#endif
 
 static ngx_http_ssl_ct_ext *ngx_http_ssl_ct_read_static_sct(ngx_conf_t *cf,
     ngx_str_t *dir, u_char *file, size_t file_len,
