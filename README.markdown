@@ -20,6 +20,10 @@ nginx must be compiled with OpenSSL support or it will fail to build. OpenSSL
 LibreSSL is not supported as it doesn't have support for the
 `SSL_CTX_add_server_custom_ext` function.
 
+BoringSSL is supported with the macro OPENSSL_IS_BORINGSSL :
+Add `--with-cc-opt='-D_OPENSSL_IS_BORINGSSL` to the nginx `./configure`
+invocation.
+
 Configuration
 -------------
 
