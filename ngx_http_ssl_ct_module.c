@@ -183,7 +183,7 @@ static char *ngx_http_ssl_ct_merge_srv_conf(ngx_conf_t *cf, void *parent,
         ngx_pfree(cf->pool, sct_list);
         return NGX_CONF_ERROR;
     }
-      #endif
+#endif
 
     return NGX_CONF_OK;
 }
