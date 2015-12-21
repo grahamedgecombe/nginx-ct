@@ -18,10 +18,6 @@
 #include <ngx_core.h>
 #include <ngx_http.h>
 
-#ifndef NGX_HTTP_SSL
-#error ngx_http_ssl_ct_module requires the ngx_http_ssl_module to be enabled
-#else
-
 #define NGX_HTTP_SSL_CT_EXT 18 /* from RFC 6962 */
 #define NGX_HTTP_SSL_CT_EXT_MAX_LEN 0xFFFF
 #define ngx_strrchr(s1, c) strrchr((const char *) s1, (int) c)
@@ -405,5 +401,3 @@ static ngx_http_ssl_ct_ext *ngx_http_ssl_ct_read_static_scts(ngx_conf_t *cf,
     sct_list->buf[1] = sct_list_len;
     return sct_list;
 }
-
-#endif
