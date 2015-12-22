@@ -1,9 +1,36 @@
-if [ $HTTP != YES ] || [ $HTTP_SSL != YES ]; then
-    echo
-    echo "$0: error: nginx-ct requires --with_http_ssl_module to be set"
-    exit 1
+ngx_addon_name=ngx_ssl_ct_module
+NGX_ADDON_DEPS="$NGX_ADDON_DEPS $ngx_addon_dir/ngx_ssl_ct.h"
+NGX_ADDON_SRCS="$NGX_ADDON_SRCS $ngx_addon_dir/ngx_ssl_ct.c"
+
+found_any=no
+
+if [ $HTTP = YES ] && [ $HTTP_SSL = YES ]; then
+    HTTP_MODULES="$HTTP_MODULES ngx_http_ssl_ct_module"
+    NGX_ADDON_SRCS="$NGX_ADDON_SRCS $ngx_addon_dir/ngx_http_ssl_ct_module.c"
+    found_any=yes
 fi
 
-ngx_addon_name=ngx_http_ssl_ct_module
-HTTP_MODULES="$HTTP_MODULES ngx_http_ssl_ct_module"
-NGX_ADDON_SRCS="$NGX_ADDON_SRCS $ngx_addon_dir/ngx_http_ssl_ct_module.c"
+if [ $MAIL = YES ] && [ $MAIL_SSL = YES ]; then
+    # XXX: we have to use MAIL_SSL_MODULE instead of MAIL_MODULES here such that
+    # ngx_mail_ssl_ct_module is started *after* ngx_mail_ssl_module
+    MAIL_SSL_MODULE="$MAIL_SSL_MODULE ngx_mail_ssl_ct_module"
+    NGX_ADDON_SRCS="$NGX_ADDON_SRCS $ngx_addon_dir/ngx_mail_ssl_ct_module.c"
+    found_any=yes
+fi
+
+if [ $STREAM = YES ] && [ $STREAM_SSL = YES ]; then
+    # XXX: we have to use STREAM_SSL_MODULE instead of STREAM_MODULES here such
+    # that ngx_stream_ssl_ct_module is started *after* ngx_stream_ssl_module
+    STREAM_SSL_MODULE="$STREAM_SSL_MODULE ngx_stream_ssl_ct_module"
+    NGX_ADDON_SRCS="$NGX_ADDON_SRCS $ngx_addon_dir/ngx_stream_ssl_ct_module.c"
+    found_any=yes
+fi
+
+if [ $found_any = no ]; then
+    echo
+    echo "$0: error: nginx-ct requires at least one of the following sets of flags:"
+    echo "  --with-http_ssl_module"
+    echo "  --with-mail --with-mail_ssl_module"
+    echo "  --with-stream --with-stream_ssl_module"
+    exit 1
+fi

@@ -14,51 +14,47 @@
  * OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
  */
 
-#include <ngx_http.h>
+#include <ngx_stream.h>
 #include "ngx_ssl_ct.h"
 
-static char *ngx_http_ssl_ct_merge_srv_conf(ngx_conf_t *cf, void *parent,
+static char *ngx_stream_ssl_ct_merge_srv_conf(ngx_conf_t *cf, void *parent,
     void *child);
 
-static ngx_http_module_t ngx_http_ssl_ct_module_ctx = {
-    NULL,                            /* preconfiguration */
-    NULL,                            /* postconfiguration */
+static ngx_stream_module_t ngx_stream_ssl_ct_module_ctx = {
+    NULL,                             /* postconfiguration */
 
-    NULL,                            /* create main configuration */
-    NULL,                            /* init main configuration */
+    NULL,                             /* create main configuration */
+    NULL,                             /* init main configuration */
 
-    &ngx_ssl_ct_create_srv_conf,     /* create server configuration */
-    &ngx_http_ssl_ct_merge_srv_conf, /* merge server configuration */
-
-    NULL,                            /* create location configuration */
-    NULL                             /* merge location configuration */
+    &ngx_ssl_ct_create_srv_conf,      /* create server configuration */
+    &ngx_stream_ssl_ct_merge_srv_conf /* merge server configuration */
 };
 
-static ngx_command_t ngx_http_ssl_ct_commands[] = {
+static ngx_command_t ngx_stream_ssl_ct_commands[] = {
     {
         ngx_string("ssl_ct"),
-        NGX_HTTP_MAIN_CONF | NGX_HTTP_SRV_CONF | NGX_CONF_FLAG,
+        NGX_STREAM_MAIN_CONF | NGX_STREAM_SRV_CONF | NGX_CONF_FLAG,
         &ngx_conf_set_flag_slot,
-        NGX_HTTP_SRV_CONF_OFFSET,
+        NGX_STREAM_SRV_CONF_OFFSET,
         offsetof(ngx_ssl_ct_srv_conf_t, enable),
         NULL
     },
     {
         ngx_string("ssl_ct_static_scts"),
-        NGX_HTTP_MAIN_CONF | NGX_HTTP_SRV_CONF | NGX_CONF_TAKE1,
+        NGX_STREAM_MAIN_CONF | NGX_STREAM_SRV_CONF | NGX_CONF_TAKE1,
         &ngx_conf_set_str_slot,
-        NGX_HTTP_SRV_CONF_OFFSET,
+        NGX_STREAM_SRV_CONF_OFFSET,
         offsetof(ngx_ssl_ct_srv_conf_t, sct),
         NULL
     },
     ngx_null_command
 };
 
-ngx_module_t ngx_http_ssl_ct_module = {
+ngx_module_t ngx_stream_ssl_ct_module = {
     NGX_MODULE_V1,
-    &ngx_http_ssl_ct_module_ctx, /* module context */
-    ngx_http_ssl_ct_commands,    /* module directives */
-    NGX_HTTP_MODULE,             /* module type */
+    &ngx_stream_ssl_ct_module_ctx, /* module context */
+    ngx_stream_ssl_ct_commands,    /* module directives */
+    NGX_STREAM_MODULE,           /* module type */
     NULL,                        /* init master */
     NULL,                        /* init module */
     NULL,                        /* init process */
@@ -69,7 +65,7 @@ ngx_module_t ngx_http_ssl_ct_module = {
     NGX_MODULE_V1_PADDING
 };
 
-static char *ngx_http_ssl_ct_merge_srv_conf(ngx_conf_t *cf, void *parent,
+static char *ngx_stream_ssl_ct_merge_srv_conf(ngx_conf_t *cf, void *parent,
     void *child)
 {
     /* merge config */
@@ -95,9 +91,9 @@ static char *ngx_http_ssl_ct_merge_srv_conf(ngx_conf_t *cf, void *parent,
         return NGX_CONF_OK;
     }
 
-    /* get ngx_http_ssl_module configuration and check if SSL is enabled */
-    ngx_http_ssl_srv_conf_t *ssl_conf = ngx_http_conf_get_module_srv_conf(cf,
-        ngx_http_ssl_module);
+    /* get ngx_stream_ssl_module configuration and check if SSL is enabled */
+    ngx_stream_ssl_conf_t *ssl_conf = ngx_stream_conf_get_module_srv_conf(cf,
+        ngx_stream_ssl_module);
 
     if (!ssl_conf->ssl.ctx)
     {
