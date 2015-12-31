@@ -13,22 +13,21 @@ Building
 --------
 
 Add `--add-module=/path/to/nginx-ct` to the nginx `./configure` invocation.
-nginx must be compiled with OpenSSL support or it will fail to build. OpenSSL
-1.0.2 or above is required, as the module makes use of the new
-`SSL_CTX_add_server_custom_ext` function.
 
-LibreSSL is not supported as it doesn't have support for the
-`SSL_CTX_add_server_custom_ext` function.
+The following versions of OpenSSL are supported:
 
-BoringSSL is supported with the macro OPENSSL\_IS\_BORINGSSL:
-add `--with-cc-opt='-D_OPENSSL_IS_BORINGSSL` to the nginx `./configure`
-invocation.
+* OpenSSL 1.0.2 or above.
+* BoringSSL [4fac72e][boringssl] or above.
+
+LibreSSL is **not** supported as it doesn't provide either of the functions used
+to add the `signed_certificate_timestamp` extension to the response
+(`SSL_CTX_add_server_custom_ext` and `SSL_CTX_set_signed_cert_timestamp_list`).
 
 Configuration
 -------------
 
-Add the following directives, which are valid in both `http` and `server`
-blocks, to your configuration file:
+Add the following directives, which are valid in `http`, `mail`, `stream` and
+`server` blocks, to your configuration file:
 
     ssl_ct on;
     ssl_ct_static_scts /path/to/sct/dir;
@@ -53,3 +52,4 @@ information and licensing terms.
 [rfc]: https://tools.ietf.org/html/rfc6962#section-3.2
 [apache]: https://httpd.apache.org/docs/trunk/mod/mod_ssl_ct.html
 [ct-submit]: https://github.com/grahamedgecombe/ct-submit
+[boringssl]: https://boringssl.googlesource.com/boringssl/+/4fac72e638c896c9fa30f5c6cd2fd7246f28f49e%5E!/
