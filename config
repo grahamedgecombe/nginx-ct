@@ -13,31 +13,78 @@
 # OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
 
 ngx_addon_name=ngx_ssl_ct_module
-NGX_ADDON_DEPS="$NGX_ADDON_DEPS $ngx_addon_dir/ngx_ssl_ct.h"
-NGX_ADDON_SRCS="$NGX_ADDON_SRCS $ngx_addon_dir/ngx_ssl_ct.c"
 
 found_any=no
 
-if [ $HTTP = YES ] && [ $HTTP_SSL = YES ]; then
-    HTTP_MODULES="$HTTP_MODULES ngx_http_ssl_ct_module"
-    NGX_ADDON_SRCS="$NGX_ADDON_SRCS $ngx_addon_dir/ngx_http_ssl_ct_module.c"
-    found_any=yes
-fi
+if test -n "$ngx_module_link"; then
+    ngx_module_type=CORE
+    ngx_module_name=ngx_ssl_ct_module
+    ngx_module_deps="$ngx_addon_dir/ngx_ssl_ct_module.h"
+    ngx_module_srcs="$ngx_addon_dir/ngx_ssl_ct_module.c"
+    ngx_module_libs=OPENSSL
+    . auto/module
 
-if [ $MAIL = YES ] && [ $MAIL_SSL = YES ]; then
-    # XXX: we have to use MAIL_SSL_MODULE instead of MAIL_MODULES here such that
-    # ngx_mail_ssl_ct_module is started *after* ngx_mail_ssl_module
-    MAIL_SSL_MODULE="$MAIL_SSL_MODULE ngx_mail_ssl_ct_module"
-    NGX_ADDON_SRCS="$NGX_ADDON_SRCS $ngx_addon_dir/ngx_mail_ssl_ct_module.c"
-    found_any=yes
-fi
+    if [ $HTTP = YES ] && [ $HTTP_SSL = YES ]; then
+        ngx_module_type=HTTP
+        ngx_module_name=ngx_http_ssl_ct_module
+        ngx_module_deps="$ngx_addon_dir/ngx_ssl_ct_module.h"
+        ngx_module_srcs="$ngx_addon_dir/ngx_http_ssl_ct_module.c"
+        ngx_module_libs=OPENSSL
+        ngx_module_order="ngx_http_ssl_module $ngx_module_name"
+        . auto/module
 
-if [ $STREAM = YES ] && [ $STREAM_SSL = YES ]; then
-    # XXX: we have to use STREAM_SSL_MODULE instead of STREAM_MODULES here such
-    # that ngx_stream_ssl_ct_module is started *after* ngx_stream_ssl_module
-    STREAM_SSL_MODULE="$STREAM_SSL_MODULE ngx_stream_ssl_ct_module"
-    NGX_ADDON_SRCS="$NGX_ADDON_SRCS $ngx_addon_dir/ngx_stream_ssl_ct_module.c"
-    found_any=yes
+        found_any=yes
+    fi
+
+    if [ $MAIL = YES ] && [ $MAIL_SSL = YES ]; then
+        ngx_module_type=MAIL
+        ngx_module_name=ngx_mail_ssl_ct_module
+        ngx_module_deps="$ngx_addon_dir/ngx_ssl_ct_module.h"
+        ngx_module_srcs="$ngx_addon_dir/ngx_mail_ssl_ct_module.c"
+        ngx_module_libs=OPENSSL
+        ngx_module_order="ngx_mail_ssl_module $ngx_module_name"
+        . auto/module
+
+        found_any=yes
+    fi
+
+    if [ $STREAM = YES ] && [ $STREAM_SSL = YES ]; then
+        ngx_module_type=STREAM
+        ngx_module_name=ngx_stream_ssl_ct_module
+        ngx_module_deps="$ngx_addon_dir/ngx_ssl_ct_module.h"
+        ngx_module_srcs="$ngx_addon_dir/ngx_stream_ssl_ct_module.c"
+        ngx_module_libs=OPENSSL
+        ngx_module_order="ngx_stream_ssl_module $ngx_module_name"
+        . auto/module
+
+        found_any=yes
+    fi
+else
+    NGX_ADDON_DEPS="$NGX_ADDON_DEPS $ngx_addon_dir/ngx_ssl_ct_module.h"
+    NGX_ADDON_SRCS="$NGX_ADDON_SRCS $ngx_addon_dir/ngx_ssl_ct_module.c"
+    CORE_MODULES="$CORE_MODULES ngx_ssl_ct_module"
+
+    if [ $HTTP = YES ] && [ $HTTP_SSL = YES ]; then
+        HTTP_MODULES="$HTTP_MODULES ngx_http_ssl_ct_module"
+        NGX_ADDON_SRCS="$NGX_ADDON_SRCS $ngx_addon_dir/ngx_http_ssl_ct_module.c"
+        found_any=yes
+    fi
+
+    if [ $MAIL = YES ] && [ $MAIL_SSL = YES ]; then
+        # XXX: we have to use MAIL_SSL_MODULE instead of MAIL_MODULES here such that
+        # ngx_mail_ssl_ct_module is started *after* ngx_mail_ssl_module
+        MAIL_SSL_MODULE="$MAIL_SSL_MODULE ngx_mail_ssl_ct_module"
+        NGX_ADDON_SRCS="$NGX_ADDON_SRCS $ngx_addon_dir/ngx_mail_ssl_ct_module.c"
+        found_any=yes
+    fi
+
+    if [ $STREAM = YES ] && [ $STREAM_SSL = YES ]; then
+        # XXX: we have to use STREAM_SSL_MODULE instead of STREAM_MODULES here such
+        # that ngx_stream_ssl_ct_module is started *after* ngx_stream_ssl_module
+        STREAM_SSL_MODULE="$STREAM_SSL_MODULE ngx_stream_ssl_ct_module"
+        NGX_ADDON_SRCS="$NGX_ADDON_SRCS $ngx_addon_dir/ngx_stream_ssl_ct_module.c"
+        found_any=yes
+    fi
 fi
 
 if [ $found_any = no ]; then

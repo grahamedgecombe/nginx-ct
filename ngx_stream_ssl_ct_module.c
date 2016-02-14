@@ -15,7 +15,7 @@
  */
 
 #include <ngx_stream.h>
-#include "ngx_ssl_ct.h"
+#include "ngx_ssl_ct_module.h"
 
 static char *ngx_stream_ssl_ct_merge_srv_conf(ngx_conf_t *cf, void *parent,
     void *child);

@@ -14,11 +14,33 @@
  * OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
  */
 
-#include "ngx_ssl_ct.h"
+#include "ngx_ssl_ct_module.h"
 
 static ngx_ssl_ct_ext *ngx_ssl_ct_read_static_sct(ngx_conf_t *cf,
     ngx_str_t *dir, u_char *file, size_t file_len,
     ngx_ssl_ct_ext *sct_list);
+
+static ngx_core_module_t ngx_ssl_ct_module_ctx = {
+    ngx_string("ssl_ct"),
+
+    NULL, /* create main configuration */
+    NULL  /* init main configuration */
+};
+
+ngx_module_t ngx_ssl_ct_module = {
+    NGX_MODULE_V1,
+    &ngx_ssl_ct_module_ctx, /* module context */
+    NULL,                   /* module directives */
+    NGX_CORE_MODULE,        /* module type */
+    NULL,                   /* init master */
+    NULL,                   /* init module */
+    NULL,                   /* init process */
+    NULL,                   /* init thread */
+    NULL,                   /* exit thread */
+    NULL,                   /* exit process */
+    NULL,                   /* exit master */
+    NGX_MODULE_V1_PADDING
+};
 
 void *ngx_ssl_ct_create_srv_conf(ngx_conf_t *cf)
 {
