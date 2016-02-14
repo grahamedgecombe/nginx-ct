@@ -14,6 +14,9 @@ Building
 
 Add `--add-module=/path/to/nginx-ct` to the nginx `./configure` invocation.
 
+If you are using nginx 1.9.11 or above, you can use
+`--add-dynamic-module=/path/to/nginx-ct` to build as a dynamic module.
+
 The following versions of OpenSSL are supported:
 
 * OpenSSL 1.0.2 or above.
@@ -25,6 +28,15 @@ to add the `signed_certificate_timestamp` extension to the response
 
 Configuration
 -------------
+
+If built as a dynamic module, add the following directives to the top level of
+your configuration file:
+
+    load_module modules/ngx_ssl_ct_module.so;
+    load_module modules/ngx_http_ssl_ct_module.so;
+
+You can also load `ngx_mail_ssl_ct_module.so` and `ngx_stream_ssl_ct_module.so`
+if you need `mail` or `stream` support.
 
 Add the following directives, which are valid in `http`, `mail`, `stream` and
 `server` blocks, to your configuration file:
