@@ -21,6 +21,9 @@ static char *ngx_stream_ssl_ct_merge_srv_conf(ngx_conf_t *cf, void *parent,
     void *child);
 
 static ngx_stream_module_t ngx_stream_ssl_ct_module_ctx = {
+#if nginx_version >= 1011002
+    NULL,                             /* preconfiguration */
+#endif
     NULL,                             /* postconfiguration */
 
     NULL,                             /* create main configuration */
