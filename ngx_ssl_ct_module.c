@@ -61,7 +61,7 @@ void *ngx_ssl_ct_create_srv_conf(ngx_conf_t *cf)
     return conf;
 }
 
-#ifndef NGX_SSL_CT_SCT_LIST
+#ifndef OPENSSL_IS_BORINGSSL
 int ngx_ssl_ct_ext_cb(SSL *s, unsigned int ext_type, const unsigned char **out,
     size_t *outlen, int *al, void *add_arg)
 {

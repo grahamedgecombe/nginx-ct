@@ -36,7 +36,7 @@ typedef struct
     size_t len;
 } ngx_ssl_ct_ext;
 
-#ifndef NGX_SSL_CT_SCT_LIST
+#ifndef OPENSSL_IS_BORINGSSL
 int ngx_ssl_ct_ext_cb(SSL *s, unsigned int ext_type, const unsigned char **out,
     size_t *outlen, int *al, void *add_arg);
 #endif
