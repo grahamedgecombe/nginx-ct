@@ -30,7 +30,7 @@ if test -n "$ngx_module_link"; then
         ngx_module_deps="$ngx_addon_dir/ngx_ssl_ct_module.h"
         ngx_module_srcs="$ngx_addon_dir/ngx_http_ssl_ct_module.c"
         ngx_module_libs=OPENSSL
-        ngx_module_order="ngx_http_ssl_module $ngx_module_name"
+        ngx_module_order="ngx_http_ssl_module ngx_ssl_ct_module $ngx_module_name"
         . auto/module
 
         found_any=yes
@@ -42,7 +42,7 @@ if test -n "$ngx_module_link"; then
         ngx_module_deps="$ngx_addon_dir/ngx_ssl_ct_module.h"
         ngx_module_srcs="$ngx_addon_dir/ngx_mail_ssl_ct_module.c"
         ngx_module_libs=OPENSSL
-        ngx_module_order="ngx_mail_ssl_module $ngx_module_name"
+        ngx_module_order="ngx_mail_ssl_module ngx_ssl_ct_module $ngx_module_name"
         . auto/module
 
         found_any=yes
@@ -54,7 +54,7 @@ if test -n "$ngx_module_link"; then
         ngx_module_deps="$ngx_addon_dir/ngx_ssl_ct_module.h"
         ngx_module_srcs="$ngx_addon_dir/ngx_stream_ssl_ct_module.c"
         ngx_module_libs=OPENSSL
-        ngx_module_order="ngx_stream_ssl_module $ngx_module_name"
+        ngx_module_order="ngx_stream_ssl_module ngx_ssl_ct_module $ngx_module_name"
         . auto/module
 
         found_any=yes

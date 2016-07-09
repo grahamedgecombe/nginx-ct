@@ -26,8 +26,8 @@
 
 typedef struct
 {
-    ngx_flag_t enable;
-    ngx_str_t  sct;
+    ngx_flag_t   enable;
+    ngx_array_t *sct_dirs;
 } ngx_ssl_ct_srv_conf_t;
 
 typedef struct
@@ -36,11 +36,14 @@ typedef struct
     size_t len;
 } ngx_ssl_ct_ext;
 
+ngx_int_t ngx_ssl_ct_init(ngx_log_t *log);
 #ifndef OPENSSL_IS_BORINGSSL
 int ngx_ssl_ct_ext_cb(SSL *s, unsigned int ext_type, const unsigned char **out,
     size_t *outlen, int *al, void *add_arg);
 #endif
 ngx_ssl_ct_ext *ngx_ssl_ct_read_static_scts(ngx_conf_t *cf, ngx_str_t *path);
 void *ngx_ssl_ct_create_srv_conf(ngx_conf_t *cf);
+char *ngx_ssl_ct_merge_srv_conf(ngx_conf_t *cf, void *parent, void *child,
+    SSL_CTX *ssl_ctx, ngx_array_t *certificates);
 
 #endif

@@ -16,6 +16,9 @@
 
 #include "ngx_ssl_ct_module.h"
 
+static int ngx_ssl_ct_sct_list_index;
+
+static void *ngx_ssl_ct_create_conf(ngx_cycle_t *cycle);
 static ngx_ssl_ct_ext *ngx_ssl_ct_read_static_sct(ngx_conf_t *cf,
     ngx_str_t *dir, u_char *file, size_t file_len,
     ngx_ssl_ct_ext *sct_list);
@@ -23,8 +26,8 @@ static ngx_ssl_ct_ext *ngx_ssl_ct_read_static_sct(ngx_conf_t *cf,
 static ngx_core_module_t ngx_ssl_ct_module_ctx = {
     ngx_string("ssl_ct"),
 
-    NULL, /* create main configuration */
-    NULL  /* init main configuration */
+    &ngx_ssl_ct_create_conf, /* create main configuration */
+    NULL                     /* init main configuration */
 };
 
 ngx_module_t ngx_ssl_ct_module = {
@@ -42,6 +45,19 @@ ngx_module_t ngx_ssl_ct_module = {
     NGX_MODULE_V1_PADDING
 };
 
+static void *ngx_ssl_ct_create_conf(ngx_cycle_t *cycle) {
+    ngx_ssl_ct_sct_list_index = X509_get_ex_new_index(0, NULL, NULL, NULL,
+        NULL);
+
+    if (ngx_ssl_ct_sct_list_index == -1) {
+        ngx_log_error(NGX_LOG_EMERG, cycle->log, 0,
+            "X509_get_ex_new_index failed");
+        return NULL;
+    }
+
+    return ngx_palloc(cycle->pool, 0);
+}
+
 void *ngx_ssl_ct_create_srv_conf(ngx_conf_t *cf)
 {
     ngx_ssl_ct_srv_conf_t *conf = ngx_pcalloc(cf->pool, sizeof(*conf));
@@ -51,24 +67,160 @@ void *ngx_ssl_ct_create_srv_conf(ngx_conf_t *cf)
     }
 
     conf->enable = NGX_CONF_UNSET;
-
-    /*
-     * set by ngx_pcalloc():
-     *
-     *     conf->sct = { 0, NULL };
-     */
+    conf->sct_dirs = NGX_CONF_UNSET_PTR;
 
     return conf;
 }
 
+char *ngx_ssl_ct_merge_srv_conf(ngx_conf_t *cf, void *parent, void *child,
+    SSL_CTX *ssl_ctx, ngx_array_t *certificates)
+{
+    /* merge config */
+    ngx_ssl_ct_srv_conf_t *prev = parent;
+    ngx_ssl_ct_srv_conf_t *conf = child;
+
+    ngx_conf_merge_value(conf->enable, prev->enable, 0);
+    ngx_conf_merge_ptr_value(conf->sct_dirs, prev->sct_dirs, NULL);
+
+    /* validate config */
+    if (conf->enable)
+    {
+        if (!conf->sct_dirs)
+        {
+            ngx_log_error(NGX_LOG_EMERG, cf->log, 0,
+                "no \"ssl_ct_static_scts\" is defined for the \"ssl_ct\""
+                "directive");
+            return NGX_CONF_ERROR;
+        }
+    }
+    else
+    {
+        return NGX_CONF_OK;
+    }
+
+    /* check if SSL is enabled */
+    if (!ssl_ctx)
+    {
+        ngx_log_error(NGX_LOG_EMERG, cf->log, 0,
+            "\"ssl_ct\" can only be enabled if ssl is enabled");
+        return NGX_CONF_ERROR;
+    }
+
+    /* check we have one SCT dir for each certificate */
+    ngx_uint_t sct_dir_count = conf->sct_dirs->nelts;
+    if (sct_dir_count != certificates->nelts)
+    {
+        ngx_log_error(NGX_LOG_EMERG, cf->log, 0,
+            "there must be exactly one \"ssl_ct_static_scts\" directive for "
+            "each \"ssl_certificate\" directive");
+        return NGX_CONF_ERROR;
+    }
+
+    /* loop through all the certs/SCT dirs */
+    ngx_str_t *sct_dirs = conf->sct_dirs->elts;
+    X509 *cert = SSL_CTX_get_ex_data(ssl_ctx, ngx_ssl_certificate_index);
+
+    ngx_uint_t i;
+    for (i = 0; i < sct_dir_count; i++)
+    {
+        /* the certificate linked list is stored in reverse order */
+        ngx_str_t *sct_dir = &sct_dirs[sct_dir_count - i - 1];
+
+        /* read the .sct files for this cert */
+        ngx_ssl_ct_ext *sct_list = ngx_ssl_ct_read_static_scts(cf, sct_dir);
+        if (!sct_list)
+        {
+            /* ngx_ssl_ct_read_static_scts calls ngx_log_error */
+            return NGX_CONF_ERROR;
+        }
+
 #ifndef OPENSSL_IS_BORINGSSL
+        /* associate the sct_list with the cert */
+        X509_set_ex_data(cert, ngx_ssl_ct_sct_list_index, sct_list);
+#else
+        if (SSL_CTX_set_signed_cert_timestamp_list(ssl_ctx, sct_list->buf,
+            sct_list->len) == 0)
+        {
+            ngx_log_error(NGX_LOG_EMERG, cf->log, 0,
+                "SSL_CTX_set_signed_cert_timestamp_list failed");
+            ngx_pfree(cf->pool, sct_list);
+            return NGX_CONF_ERROR;
+        }
+
+        if (conf->sct_dirs->nelts > 1) {
+            ngx_log_error(NGX_LOG_WARN, cf->log, 0,
+                "BoringSSL does not support using SCTs with multiple "
+                "certificates, the last \"ssl_ct_static_scts\" directive will "
+                "be used for all certificates");
+        }
+
+        break;
+#endif
+
+#if nginx_version >= 1011000
+        cert = X509_get_ex_data(cert, ngx_ssl_next_certificate_index);
+#else
+        break;
+#endif
+    }
+
+#ifndef OPENSSL_IS_BORINGSSL
+    /* add OpenSSL TLS extension */
+    if (SSL_CTX_add_server_custom_ext(ssl_ctx, NGX_SSL_CT_EXT,
+        &ngx_ssl_ct_ext_cb, NULL, NULL, NULL, NULL) == 0)
+    {
+        ngx_log_error(NGX_LOG_EMERG, cf->log, 0,
+            "SSL_CTX_add_server_custom_ext failed");
+        return NGX_CONF_ERROR;
+    }
+#endif
+
+    return NGX_CONF_OK;
+}
+
+#ifndef OPENSSL_IS_BORINGSSL
+/*
+ * ssl_get_server_send_pkey() is the only function I've been able to find to
+ * grab the certificate that OpenSSL negotiated to use (before the handshake is
+ * over). Unfortunately, it's not part of the public API - hence the following
+ * declarations. If anybody knows a better way, please let me know!
+ */
+typedef struct {
+    X509 *x509;
+} CERT_PKEY;
+
+CERT_PKEY *ssl_get_server_send_pkey(SSL *s);
+
 int ngx_ssl_ct_ext_cb(SSL *s, unsigned int ext_type, const unsigned char **out,
     size_t *outlen, int *al, void *add_arg)
 {
-    ngx_ssl_ct_ext *sct_list = add_arg;
-    *out    = sct_list->buf;
-    *outlen = sct_list->len;
-    return 1;
+    CERT_PKEY *cert = ssl_get_server_send_pkey(s);
+    if (!cert) {
+        /*
+         * Anonymous/PSK cipher suites don't use certificates, so don't attempt
+         * to add the SCT extension to the ServerHello.
+         *
+         * In an ideal world this would work, but ssl_get_server_send_pkey()
+         * ultimately calls SSLerr() if there is no cert (as well as returning
+         * NULL), so the connection is closed with an alert for now.
+         */
+        return 0;
+    }
+
+    /* get sct_list for the cert OpenSSL chose to use for this connection */
+    ngx_ssl_ct_ext *sct_list = X509_get_ex_data(cert->x509,
+        ngx_ssl_ct_sct_list_index);
+
+    if (sct_list) {
+        *out    = sct_list->buf;
+        *outlen = sct_list->len;
+        return 1;
+    } else {
+        ngx_connection_t *c = ngx_ssl_get_connection(s);
+        ngx_log_error(NGX_LOG_WARN, c->log, 0,
+            "X509 object missing sct_list ex_data");
+        return -1;
+    }
 }
 #endif
 
