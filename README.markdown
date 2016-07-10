@@ -49,6 +49,21 @@ expected to be encoded in binary (see the definition of
 `SignedCertificateTimestamp` struct in [section 3.2 of RFC 6962][rfc]). This is
 the same format used by Apache's [mod\_ssl\_ct][apache] module.
 
+The module is compatible with nginx's multiple certificate support if you are
+using nginx 1.11.0 or above and are not using BoringSSL. Exactly one
+`ssl_ct_static_scts` directive must be specified for each `ssl_certificate`
+directive:
+
+    ssl_ct on;
+
+    ssl_certificate /path/to/rsa.pem;
+    ssl_certificate_key /path/to/rsa.key;
+    ssl_ct_static_scts /path/to/rsa/scts;
+
+    ssl_certificate /path/to/ecdsa.pem;
+    ssl_certificate_key /path/to/ecdsa.key;
+    ssl_ct_static_scts /path/to/ecdsa/scts;
+
 [ct-submit][ct-submit] can be used to submit certificates to log servers and
 encode the `SignedCertificateTimestamp` struct in the appropriate format for use
 with this module.
