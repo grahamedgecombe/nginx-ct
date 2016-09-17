@@ -179,36 +179,31 @@ char *ngx_ssl_ct_merge_srv_conf(ngx_conf_t *cf, void *parent, void *child,
 }
 
 #ifndef OPENSSL_IS_BORINGSSL
-/*
- * ssl_get_server_send_pkey() is the only function I've been able to find to
- * grab the certificate that OpenSSL negotiated to use (before the handshake is
- * over). Unfortunately, it's not part of the public API - hence the following
- * declarations. If anybody knows a better way, please let me know!
- */
-typedef struct {
-    X509 *x509;
-} CERT_PKEY;
-
-CERT_PKEY *ssl_get_server_send_pkey(SSL *s);
-
 int ngx_ssl_ct_ext_cb(SSL *s, unsigned int ext_type, const unsigned char **out,
     size_t *outlen, int *al, void *add_arg)
 {
-    CERT_PKEY *cert = ssl_get_server_send_pkey(s);
-    if (!cert) {
+    /* get the cert OpenSSL chose to use for this connection */
+    int result = SSL_set_current_cert(s, SSL_CERT_SET_SERVER);
+    if (result == 2) {
         /*
          * Anonymous/PSK cipher suites don't use certificates, so don't attempt
          * to add the SCT extension to the ServerHello.
-         *
-         * In an ideal world this would work, but ssl_get_server_send_pkey()
-         * ultimately calls SSLerr() if there is no cert (as well as returning
-         * NULL), so the connection is closed with an alert for now.
          */
+        return 0;
+    } else if (result != 1) {
+        ngx_connection_t *c = ngx_ssl_get_connection(s);
+        ngx_log_error(NGX_LOG_WARN, c->log, 0, "SSL_set_current_cert failed");
+        return -1;
+    }
+
+    X509 *x509 = SSL_get_certificate(s);
+    if (!x509) {
+        /* as above */
         return 0;
     }
 
     /* get sct_list for the cert OpenSSL chose to use for this connection */
-    ngx_ssl_ct_ext *sct_list = X509_get_ex_data(cert->x509,
+    ngx_ssl_ct_ext *sct_list = X509_get_ex_data(x509,
         ngx_ssl_ct_sct_list_index);
 
     if (sct_list) {
