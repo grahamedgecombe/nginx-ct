@@ -134,6 +134,11 @@ char *ngx_ssl_ct_merge_srv_conf(ngx_conf_t *cf, void *parent, void *child,
             return NGX_CONF_ERROR;
         }
 
+        if (sct_list->len == 0) {
+            ngx_pfree(cf->pool, sct_list);
+            continue;
+        }
+
 #ifndef OPENSSL_IS_BORINGSSL
         /* associate the sct_list with the cert */
         X509_set_ex_data(cert, ngx_ssl_ct_sct_list_index, sct_list);
@@ -211,10 +216,7 @@ int ngx_ssl_ct_ext_cb(SSL *s, unsigned int ext_type, const unsigned char **out,
         *outlen = sct_list->len;
         return 1;
     } else {
-        ngx_connection_t *c = ngx_ssl_get_connection(s);
-        ngx_log_error(NGX_LOG_WARN, c->log, 0,
-            "X509 object missing sct_list ex_data");
-        return -1;
+        return 0;
     }
 }
 #endif
@@ -223,15 +225,7 @@ static ngx_ssl_ct_ext *ngx_ssl_ct_read_static_sct(ngx_conf_t *cf,
     ngx_str_t *dir, u_char *file, size_t file_len,
     ngx_ssl_ct_ext *sct_list)
 {
-    /* reserve two bytes for the length */
-    size_t len_pos = sct_list->len;
-    sct_list->len += 2;
-    if (sct_list->len > NGX_SSL_CT_EXT_MAX_LEN)
-    {
-        ngx_log_error(NGX_LOG_EMERG, cf->log, 0,
-            "sct_list structure exceeds maximum length");
-        return NULL;
-    }
+    int ok = 0;
 
     /* join dir and file name */
     size_t path_len = dir->len + file_len + 2;
@@ -261,36 +255,30 @@ static ngx_ssl_ct_ext *ngx_ssl_ct_read_static_sct(ngx_conf_t *cf,
     {
         ngx_log_error(NGX_LOG_EMERG, cf->log, ngx_errno,
             ngx_fd_info_n " \"%s\" failed", path);
-
-        if (ngx_close_file(fd) != NGX_OK)
-        {
-            ngx_log_error(NGX_LOG_EMERG, cf->log, ngx_errno,
-                ngx_close_file_n " \"%s\" failed", path);
-        }
-
-        ngx_pfree(cf->pool, path);
-        return NULL;
+        goto out;
     }
 
-    size_t sct_len = ngx_file_size(&stat);
+    const size_t sct_len = ngx_file_size(&stat);
+    if (sct_len == 0) {
+        ok = 1;
+        goto out;
+    }
 
-    /* reserve sct_len bytes for the SCT */
-    size_t sct_pos = sct_list->len;
-    sct_list->len += sct_len;
-    if (sct_list->len > NGX_SSL_CT_EXT_MAX_LEN)
+    const size_t len_pos = sct_list->len;
+    size_t sct_pos = len_pos + 2;
+
+    /* reserve two bytes for the length and sct_len bytes for the SCT. */
+    const size_t sct_and_len_size = sct_len + 2;
+
+    if (sct_and_len_size < sct_len ||
+        sct_list->len + sct_and_len_size < sct_list->len ||
+        sct_list->len + sct_and_len_size > NGX_SSL_CT_EXT_MAX_LEN)
     {
         ngx_log_error(NGX_LOG_EMERG, cf->log, 0,
             "sct_list structure exceeds maximum length");
-
-        if (ngx_close_file(fd) != NGX_OK)
-        {
-            ngx_log_error(NGX_LOG_EMERG, cf->log, ngx_errno,
-                ngx_close_file_n " \"%s\" failed", path);
-        }
-
-        ngx_pfree(cf->pool, path);
-        return NULL;
+        goto out;
     }
+    sct_list->len += sct_and_len_size;
 
     /* read the SCT from disk */
     size_t to_read = sct_len;
@@ -301,33 +289,29 @@ static ngx_ssl_ct_ext *ngx_ssl_ct_read_static_sct(ngx_conf_t *cf,
         {
             ngx_log_error(NGX_LOG_EMERG, cf->log, ngx_errno,
                 ngx_read_fd_n " \"%s\" failed", path);
-
-            if (ngx_close_file(fd) != NGX_OK)
-            {
-                ngx_log_error(NGX_LOG_EMERG, cf->log, ngx_errno,
-                    ngx_close_file_n " \"%s\" failed", path);
-            }
-
-            ngx_pfree(cf->pool, path);
-            return NULL;
+            goto out;
         }
 
         to_read -= n;
         sct_pos += n;
     }
 
-    /* close file */
+    /* fill in the length bytes and return */
+    sct_list->buf[len_pos] = sct_len >> 8;
+    sct_list->buf[len_pos + 1] = sct_len;
+    ok = 1;
+
+out:
     if (ngx_close_file(fd) != NGX_OK)
     {
         ngx_log_error(NGX_LOG_EMERG, cf->log, ngx_errno,
             ngx_close_file_n " \"%s\" failed", path);
     }
-
     ngx_pfree(cf->pool, path);
 
-    /* fill in the length bytes and return */
-    sct_list->buf[len_pos] = sct_len >> 8;
-    sct_list->buf[len_pos + 1] = sct_len;
+    if (!ok) {
+        return NULL;
+    }
     return sct_list;
 }
 
@@ -418,7 +402,11 @@ ngx_ssl_ct_ext *ngx_ssl_ct_read_static_scts(ngx_conf_t *cf, ngx_str_t *path)
 
     /* fill in the length bytes and return */
     size_t sct_list_len = sct_list->len - 2;
-    sct_list->buf[0] = sct_list_len >> 8;
-    sct_list->buf[1] = sct_list_len;
+    if (sct_list_len > 0) {
+        sct_list->buf[0] = sct_list_len >> 8;
+        sct_list->buf[1] = sct_list_len;
+    } else {
+        sct_list->len = 0;
+    }
     return sct_list;
 }
