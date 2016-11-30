@@ -136,7 +136,7 @@ char *ngx_ssl_ct_merge_srv_conf(ngx_conf_t *cf, void *parent, void *child,
 
         if (sct_list->len == 0) {
             ngx_pfree(cf->pool, sct_list);
-            continue;
+            goto next;
         }
 
 #ifndef OPENSSL_IS_BORINGSSL
@@ -162,6 +162,7 @@ char *ngx_ssl_ct_merge_srv_conf(ngx_conf_t *cf, void *parent, void *child,
         break;
 #endif
 
+next:
 #if nginx_version >= 1011000
         cert = X509_get_ex_data(cert, ngx_ssl_next_certificate_index);
 #else
