@@ -155,8 +155,8 @@ char *ngx_ssl_ct_merge_srv_conf(ngx_conf_t *cf, void *parent, void *child,
         if (conf->sct_dirs->nelts > 1) {
             ngx_log_error(NGX_LOG_WARN, cf->log, 0,
                 "BoringSSL does not support using SCTs with multiple "
-                "certificates, the last \"ssl_ct_static_scts\" directive will "
-                "be used for all certificates");
+                "certificates, the last non-empty \"ssl_ct_static_scts\" "
+                "directory will be used for all certificates");
         }
 
         break;
