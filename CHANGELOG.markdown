@@ -1,3 +1,7 @@
+# UNRELEASED
+
+* Don't send invalid zero-length SCT extensions.
+
 # 1.3.1 (20 September 2016)
 
 * Use exported functions to get the negotiated SSL certificate.
