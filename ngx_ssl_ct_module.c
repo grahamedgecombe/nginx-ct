@@ -170,7 +170,7 @@ next:
 #endif
     }
 
-#ifndef OPENSSL_IS_BORINGSSL
+#if !defined(OPENSSL_IS_BORINGSSL) && !defined(LIBRESSL_VERSION_NUMBER)
     /* add OpenSSL TLS extension */
     if (SSL_CTX_add_server_custom_ext(ssl_ctx, NGX_SSL_CT_EXT,
         &ngx_ssl_ct_ext_cb, NULL, NULL, NULL, NULL) == 0)
@@ -184,7 +184,7 @@ next:
     return NGX_CONF_OK;
 }
 
-#ifndef OPENSSL_IS_BORINGSSL
+#if !defined(OPENSSL_IS_BORINGSSL) && !defined(LIBRESSL_VERSION_NUMBER)
 int ngx_ssl_ct_ext_cb(SSL *s, unsigned int ext_type, const unsigned char **out,
     size_t *outlen, int *al, void *add_arg)
 {
