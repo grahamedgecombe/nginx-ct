@@ -69,8 +69,7 @@ ngx_module_t ngx_stream_ssl_ct_module = {
 };
 
 static char *ngx_stream_ssl_ct_merge_srv_conf(ngx_conf_t *cf, void *parent,
-    void *child)
-{
+    void *child) {
     ngx_stream_ssl_conf_t *ssl_conf = ngx_stream_conf_get_module_srv_conf(cf,
         ngx_stream_ssl_module);
 

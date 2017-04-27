@@ -58,11 +58,9 @@ static void *ngx_ssl_ct_create_conf(ngx_cycle_t *cycle) {
     return ngx_palloc(cycle->pool, 0);
 }
 
-void *ngx_ssl_ct_create_srv_conf(ngx_conf_t *cf)
-{
+void *ngx_ssl_ct_create_srv_conf(ngx_conf_t *cf) {
     ngx_ssl_ct_srv_conf_t *conf = ngx_pcalloc(cf->pool, sizeof(*conf));
-    if (conf == NULL)
-    {
+    if (conf == NULL) {
         return NULL;
     }
 
@@ -73,8 +71,7 @@ void *ngx_ssl_ct_create_srv_conf(ngx_conf_t *cf)
 }
 
 char *ngx_ssl_ct_merge_srv_conf(ngx_conf_t *cf, void *parent, void *child,
-    SSL_CTX *ssl_ctx, ngx_array_t *certificates)
-{
+    SSL_CTX *ssl_ctx, ngx_array_t *certificates) {
     /* merge config */
     ngx_ssl_ct_srv_conf_t *prev = parent;
     ngx_ssl_ct_srv_conf_t *conf = child;
@@ -83,24 +80,19 @@ char *ngx_ssl_ct_merge_srv_conf(ngx_conf_t *cf, void *parent, void *child,
     ngx_conf_merge_ptr_value(conf->sct_dirs, prev->sct_dirs, NULL);
 
     /* validate config */
-    if (conf->enable)
-    {
-        if (!conf->sct_dirs)
-        {
+    if (conf->enable) {
+        if (!conf->sct_dirs) {
             ngx_log_error(NGX_LOG_EMERG, cf->log, 0,
                 "no \"ssl_ct_static_scts\" is defined for the \"ssl_ct\""
                 "directive");
             return NGX_CONF_ERROR;
         }
-    }
-    else
-    {
+    } else {
         return NGX_CONF_OK;
     }
 
     /* check if SSL is enabled */
-    if (!ssl_ctx)
-    {
+    if (!ssl_ctx) {
         ngx_log_error(NGX_LOG_EMERG, cf->log, 0,
             "\"ssl_ct\" can only be enabled if ssl is enabled");
         return NGX_CONF_ERROR;
@@ -108,8 +100,7 @@ char *ngx_ssl_ct_merge_srv_conf(ngx_conf_t *cf, void *parent, void *child,
 
     /* check we have one SCT dir for each certificate */
     ngx_uint_t sct_dir_count = conf->sct_dirs->nelts;
-    if (sct_dir_count != certificates->nelts)
-    {
+    if (sct_dir_count != certificates->nelts) {
         ngx_log_error(NGX_LOG_EMERG, cf->log, 0,
             "there must be exactly one \"ssl_ct_static_scts\" directive for "
             "each \"ssl_certificate\" directive");
@@ -121,15 +112,13 @@ char *ngx_ssl_ct_merge_srv_conf(ngx_conf_t *cf, void *parent, void *child,
     X509 *cert = SSL_CTX_get_ex_data(ssl_ctx, ngx_ssl_certificate_index);
 
     ngx_uint_t i;
-    for (i = 0; i < sct_dir_count; i++)
-    {
+    for (i = 0; i < sct_dir_count; i++) {
         /* the certificate linked list is stored in reverse order */
         ngx_str_t *sct_dir = &sct_dirs[sct_dir_count - i - 1];
 
         /* read the .sct files for this cert */
         ngx_ssl_ct_ext *sct_list = ngx_ssl_ct_read_static_scts(cf, sct_dir);
-        if (!sct_list)
-        {
+        if (!sct_list) {
             /* ngx_ssl_ct_read_static_scts calls ngx_log_error */
             return NGX_CONF_ERROR;
         }
@@ -144,8 +133,7 @@ char *ngx_ssl_ct_merge_srv_conf(ngx_conf_t *cf, void *parent, void *child,
         X509_set_ex_data(cert, ngx_ssl_ct_sct_list_index, sct_list);
 #else
         if (SSL_CTX_set_signed_cert_timestamp_list(ssl_ctx, sct_list->buf,
-            sct_list->len) == 0)
-        {
+            sct_list->len) == 0) {
             ngx_log_error(NGX_LOG_EMERG, cf->log, 0,
                 "SSL_CTX_set_signed_cert_timestamp_list failed");
             ngx_pfree(cf->pool, sct_list);
@@ -177,16 +165,14 @@ next:
                 | SSL_EXT_TLS1_2_SERVER_HELLO
                 | SSL_EXT_TLS1_3_CERTIFICATE;
     if (SSL_CTX_add_custom_ext(ssl_ctx, NGX_SSL_CT_EXT, context,
-        &ngx_ssl_ct_ext_cb, NULL, NULL, NULL, NULL) == 0)
-    {
+        &ngx_ssl_ct_ext_cb, NULL, NULL, NULL, NULL) == 0) {
         ngx_log_error(NGX_LOG_EMERG, cf->log, 0,
             "SSL_CTX_add_custom_ext failed");
         return NGX_CONF_ERROR;
     }
 #  else
     if (SSL_CTX_add_server_custom_ext(ssl_ctx, NGX_SSL_CT_EXT,
-        &ngx_ssl_ct_ext_cb, NULL, NULL, NULL, NULL) == 0)
-    {
+        &ngx_ssl_ct_ext_cb, NULL, NULL, NULL, NULL) == 0) {
         ngx_log_error(NGX_LOG_EMERG, cf->log, 0,
             "SSL_CTX_add_server_custom_ext failed");
         return NGX_CONF_ERROR;
@@ -201,21 +187,18 @@ next:
 #  if OPENSSL_VERSION_NUMBER >= 0x10101000L
 int ngx_ssl_ct_ext_cb(SSL *s, unsigned int ext_type, unsigned int context,
     const unsigned char **out, size_t *outlen, X509 *x, size_t chainidx,
-    int *al, void *add_arg)
-{
+    int *al, void *add_arg) {
     /* only include SCTs in the end-entity certificate */
     if (context == SSL_EXT_TLS1_3_CERTIFICATE && chainidx != 0) {
         return 0;
     }
 #  else
 int ngx_ssl_ct_ext_cb(SSL *s, unsigned int ext_type, const unsigned char **out,
-    size_t *outlen, int *al, void *add_arg)
-{
+    size_t *outlen, int *al, void *add_arg) {
     X509 *x = NULL;
 #  endif
 
-    if (!x)
-    {
+    if (!x) {
         /* get the cert OpenSSL chose to use for this connection */
         int result = SSL_set_current_cert(s, SSL_CERT_SET_SERVER);
         if (result == 2) {
@@ -252,15 +235,13 @@ int ngx_ssl_ct_ext_cb(SSL *s, unsigned int ext_type, const unsigned char **out,
 
 static ngx_ssl_ct_ext *ngx_ssl_ct_read_static_sct(ngx_conf_t *cf,
     ngx_str_t *dir, u_char *file, size_t file_len,
-    ngx_ssl_ct_ext *sct_list)
-{
+    ngx_ssl_ct_ext *sct_list) {
     int ok = 0;
 
     /* join dir and file name */
     size_t path_len = dir->len + file_len + 2;
     u_char *path = ngx_pcalloc(cf->pool, path_len);
-    if (path == NULL)
-    {
+    if (path == NULL) {
         return NULL;
     }
 
@@ -270,8 +251,7 @@ static ngx_ssl_ct_ext *ngx_ssl_ct_read_static_sct(ngx_conf_t *cf,
 
     /* open file */
     ngx_fd_t fd = ngx_open_file(path, NGX_FILE_RDONLY, NGX_FILE_OPEN, 0);
-    if (fd == NGX_FILE_ERROR)
-    {
+    if (fd == NGX_FILE_ERROR) {
         ngx_log_error(NGX_LOG_EMERG, cf->log, ngx_errno,
             ngx_open_file_n " \"%s\" failed", path);
         ngx_pfree(cf->pool, path);
@@ -280,8 +260,7 @@ static ngx_ssl_ct_ext *ngx_ssl_ct_read_static_sct(ngx_conf_t *cf,
 
     /* get file size */
     ngx_file_info_t stat;
-    if (ngx_fd_info(fd, &stat) == NGX_FILE_ERROR)
-    {
+    if (ngx_fd_info(fd, &stat) == NGX_FILE_ERROR) {
         ngx_log_error(NGX_LOG_EMERG, cf->log, ngx_errno,
             ngx_fd_info_n " \"%s\" failed", path);
         goto out;
@@ -301,8 +280,7 @@ static ngx_ssl_ct_ext *ngx_ssl_ct_read_static_sct(ngx_conf_t *cf,
 
     if (sct_and_len_size < sct_len ||
         sct_list->len + sct_and_len_size < sct_list->len ||
-        sct_list->len + sct_and_len_size > NGX_SSL_CT_EXT_MAX_LEN)
-    {
+        sct_list->len + sct_and_len_size > NGX_SSL_CT_EXT_MAX_LEN) {
         ngx_log_error(NGX_LOG_EMERG, cf->log, 0,
             "sct_list structure exceeds maximum length");
         goto out;
@@ -311,11 +289,9 @@ static ngx_ssl_ct_ext *ngx_ssl_ct_read_static_sct(ngx_conf_t *cf,
 
     /* read the SCT from disk */
     size_t to_read = sct_len;
-    while (to_read > 0)
-    {
+    while (to_read > 0) {
         ssize_t n = ngx_read_fd(fd, sct_list->buf + sct_pos, to_read);
-        if (n == NGX_FILE_ERROR)
-        {
+        if (n == NGX_FILE_ERROR) {
             ngx_log_error(NGX_LOG_EMERG, cf->log, ngx_errno,
                 ngx_read_fd_n " \"%s\" failed", path);
             goto out;
@@ -331,8 +307,7 @@ static ngx_ssl_ct_ext *ngx_ssl_ct_read_static_sct(ngx_conf_t *cf,
     ok = 1;
 
 out:
-    if (ngx_close_file(fd) != NGX_OK)
-    {
+    if (ngx_close_file(fd) != NGX_OK) {
         ngx_log_error(NGX_LOG_EMERG, cf->log, ngx_errno,
             ngx_close_file_n " \"%s\" failed", path);
     }
@@ -344,11 +319,9 @@ out:
     return sct_list;
 }
 
-ngx_ssl_ct_ext *ngx_ssl_ct_read_static_scts(ngx_conf_t *cf, ngx_str_t *path)
-{
+ngx_ssl_ct_ext *ngx_ssl_ct_read_static_scts(ngx_conf_t *cf, ngx_str_t *path) {
     /* resolve relative paths */
-    if (ngx_conf_full_name(cf->cycle, path, 1) != NGX_OK)
-    {
+    if (ngx_conf_full_name(cf->cycle, path, 1) != NGX_OK) {
         ngx_log_error(NGX_LOG_EMERG, cf->log, ngx_errno,
             "ngx_conf_full_name \"%V\" failed");
         return NULL;
@@ -356,8 +329,7 @@ ngx_ssl_ct_ext *ngx_ssl_ct_read_static_scts(ngx_conf_t *cf, ngx_str_t *path)
 
     /* allocate sct_list structure */
     ngx_ssl_ct_ext *sct_list = ngx_pcalloc(cf->pool, sizeof(*sct_list));
-    if (!sct_list)
-    {
+    if (!sct_list) {
         return NULL;
     }
 
@@ -366,8 +338,7 @@ ngx_ssl_ct_ext *ngx_ssl_ct_read_static_scts(ngx_conf_t *cf, ngx_str_t *path)
 
     /* open directory */
     ngx_dir_t dir;
-    if (ngx_open_dir(path, &dir) != NGX_OK)
-    {
+    if (ngx_open_dir(path, &dir) != NGX_OK) {
         ngx_log_error(NGX_LOG_EMERG, cf->log, ngx_errno,
             ngx_open_dir_n " \"%V\" failed", path);
         ngx_pfree(cf->pool, sct_list);
@@ -375,20 +346,15 @@ ngx_ssl_ct_ext *ngx_ssl_ct_read_static_scts(ngx_conf_t *cf, ngx_str_t *path)
     }
 
     /* iterate through all files */
-    for (;;)
-    {
+    for (;;) {
         ngx_set_errno(NGX_ENOMOREFILES);
 
-        if (ngx_read_dir(&dir) != NGX_OK)
-        {
+        if (ngx_read_dir(&dir) != NGX_OK) {
             ngx_err_t err = ngx_errno;
 
-            if (err == NGX_ENOMOREFILES)
-            {
+            if (err == NGX_ENOMOREFILES) {
                 break;
-            }
-            else
-            {
+            } else {
                 ngx_log_error(NGX_LOG_EMERG, cf->log, err,
                     ngx_read_dir_n " \"%V\" failed", path);
                 ngx_pfree(cf->pool, sct_list);
@@ -399,21 +365,18 @@ ngx_ssl_ct_ext *ngx_ssl_ct_read_static_scts(ngx_conf_t *cf, ngx_str_t *path)
         /* skip dotfiles */
         size_t file_len = ngx_de_namelen(&dir);
         u_char *file = ngx_de_name(&dir);
-        if (file[0] == '.')
-        {
+        if (file[0] == '.') {
             continue;
         }
 
         /* skip files unless the extension is .sct */
         u_char *file_ext = (u_char *) ngx_strrchr(file, '.');
-        if (!file_ext || ngx_strcmp(file_ext, ".sct"))
-        {
+        if (!file_ext || ngx_strcmp(file_ext, ".sct")) {
             continue;
         }
 
         /* add the .sct file to the sct_list */
-        if (!ngx_ssl_ct_read_static_sct(cf, path, file, file_len, sct_list))
-        {
+        if (!ngx_ssl_ct_read_static_sct(cf, path, file, file_len, sct_list)) {
             /* ngx_ssl_ct_read_static_sct calls ngx_log_error */
             ngx_pfree(cf->pool, sct_list);
             return NULL;
@@ -421,8 +384,7 @@ ngx_ssl_ct_ext *ngx_ssl_ct_read_static_scts(ngx_conf_t *cf, ngx_str_t *path)
     }
 
     /* close directory */
-    if (ngx_close_dir(&dir) != NGX_OK)
-    {
+    if (ngx_close_dir(&dir) != NGX_OK) {
         ngx_log_error(NGX_LOG_EMERG, cf->log, ngx_errno,
             ngx_close_dir_n " \"%V\" failed", path);
         ngx_pfree(cf->pool, sct_list);

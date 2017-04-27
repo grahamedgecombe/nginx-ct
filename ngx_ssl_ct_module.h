@@ -24,14 +24,12 @@
 #define NGX_SSL_CT_EXT_MAX_LEN 0xFFFF
 #define ngx_strrchr(s1, c) strrchr((const char *) s1, (int) c)
 
-typedef struct
-{
+typedef struct {
     ngx_flag_t   enable;
     ngx_array_t *sct_dirs;
 } ngx_ssl_ct_srv_conf_t;
 
-typedef struct
-{
+typedef struct {
     u_char buf[NGX_SSL_CT_EXT_MAX_LEN];
     size_t len;
 } ngx_ssl_ct_ext;

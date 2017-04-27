@@ -70,8 +70,7 @@ ngx_module_t ngx_http_ssl_ct_module = {
 };
 
 static char *ngx_http_ssl_ct_merge_srv_conf(ngx_conf_t *cf, void *parent,
-    void *child)
-{
+    void *child) {
     ngx_http_ssl_srv_conf_t *ssl_conf = ngx_http_conf_get_module_srv_conf(cf,
         ngx_http_ssl_module);
 
