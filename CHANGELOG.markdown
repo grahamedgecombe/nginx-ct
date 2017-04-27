@@ -1,3 +1,7 @@
+# UNRELEASED
+
+* Add TLS 1.3 support.
+
 # 1.3.2 (30 November 2016)
 
 * Don't send invalid zero-length SCT extensions.
