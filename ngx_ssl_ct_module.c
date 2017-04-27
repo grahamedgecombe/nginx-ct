@@ -172,6 +172,18 @@ next:
 
 #ifndef OPENSSL_IS_BORINGSSL
     /* add OpenSSL TLS extension */
+#  if OPENSSL_VERSION_NUMBER >= 0x10101000L
+    int context = SSL_EXT_CLIENT_HELLO
+                | SSL_EXT_TLS1_2_SERVER_HELLO
+                | SSL_EXT_TLS1_3_CERTIFICATE;
+    if (SSL_CTX_add_custom_ext(ssl_ctx, NGX_SSL_CT_EXT, context,
+        &ngx_ssl_ct_ext_cb, NULL, NULL, NULL, NULL) == 0)
+    {
+        ngx_log_error(NGX_LOG_EMERG, cf->log, 0,
+            "SSL_CTX_add_custom_ext failed");
+        return NGX_CONF_ERROR;
+    }
+#  else
     if (SSL_CTX_add_server_custom_ext(ssl_ctx, NGX_SSL_CT_EXT,
         &ngx_ssl_ct_ext_cb, NULL, NULL, NULL, NULL) == 0)
     {
@@ -179,38 +191,54 @@ next:
             "SSL_CTX_add_server_custom_ext failed");
         return NGX_CONF_ERROR;
     }
+#  endif
 #endif
 
     return NGX_CONF_OK;
 }
 
 #ifndef OPENSSL_IS_BORINGSSL
+#  if OPENSSL_VERSION_NUMBER >= 0x10101000L
+int ngx_ssl_ct_ext_cb(SSL *s, unsigned int ext_type, unsigned int context,
+    const unsigned char **out, size_t *outlen, X509 *x, size_t chainidx,
+    int *al, void *add_arg)
+{
+    /* only include SCTs in the end-entity certificate */
+    if (context == SSL_EXT_TLS1_3_CERTIFICATE && chainidx != 0) {
+        return 0;
+    }
+#  else
 int ngx_ssl_ct_ext_cb(SSL *s, unsigned int ext_type, const unsigned char **out,
     size_t *outlen, int *al, void *add_arg)
 {
-    /* get the cert OpenSSL chose to use for this connection */
-    int result = SSL_set_current_cert(s, SSL_CERT_SET_SERVER);
-    if (result == 2) {
-        /*
-         * Anonymous/PSK cipher suites don't use certificates, so don't attempt
-         * to add the SCT extension to the ServerHello.
-         */
-        return 0;
-    } else if (result != 1) {
-        ngx_connection_t *c = ngx_ssl_get_connection(s);
-        ngx_log_error(NGX_LOG_WARN, c->log, 0, "SSL_set_current_cert failed");
-        return -1;
-    }
+    X509 *x = NULL;
+#  endif
 
-    X509 *x509 = SSL_get_certificate(s);
-    if (!x509) {
-        /* as above */
-        return 0;
+    if (!x)
+    {
+        /* get the cert OpenSSL chose to use for this connection */
+        int result = SSL_set_current_cert(s, SSL_CERT_SET_SERVER);
+        if (result == 2) {
+            /*
+             * Anonymous/PSK cipher suites don't use certificates, so don't attempt
+             * to add the SCT extension to the ServerHello.
+             */
+            return 0;
+        } else if (result != 1) {
+            ngx_connection_t *c = ngx_ssl_get_connection(s);
+            ngx_log_error(NGX_LOG_WARN, c->log, 0, "SSL_set_current_cert failed");
+            return -1;
+        }
+
+        x = SSL_get_certificate(s);
+        if (!x) {
+            /* as above */
+            return 0;
+        }
     }
 
     /* get sct_list for the cert OpenSSL chose to use for this connection */
-    ngx_ssl_ct_ext *sct_list = X509_get_ex_data(x509,
-        ngx_ssl_ct_sct_list_index);
+    ngx_ssl_ct_ext *sct_list = X509_get_ex_data(x, ngx_ssl_ct_sct_list_index);
 
     if (sct_list) {
         *out    = sct_list->buf;
