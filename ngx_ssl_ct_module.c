@@ -16,6 +16,10 @@
 
 #include "ngx_ssl_ct_module.h"
 
+#include <openssl/ossl_typ.h>
+#include <openssl/x509.h>
+#include <openssl/ct.h>
+
 static int ngx_ssl_ct_sct_list_index;
 
 static void *ngx_ssl_ct_create_conf(ngx_cycle_t *cycle);
@@ -112,12 +116,12 @@ char *ngx_ssl_ct_merge_srv_conf(ngx_conf_t *cf, void *parent, void *child,
     X509 *cert = SSL_CTX_get_ex_data(ssl_ctx, ngx_ssl_certificate_index);
 
     ngx_uint_t i;
-    for (i = 0; i < sct_dir_count; i++) {
+    for (i = 0; i < certificates->nelts; i++) {
         /* the certificate linked list is stored in reverse order */
         ngx_str_t *sct_dir = &sct_dirs[sct_dir_count - i - 1];
 
         /* read the .sct files for this cert */
-        ngx_ssl_ct_ext *sct_list = ngx_ssl_ct_read_static_scts(cf, sct_dir);
+        ngx_ssl_ct_ext *sct_list = ngx_ssl_ct_read_static_scts(cf, conf, cert);
         if (!sct_list) {
             /* ngx_ssl_ct_read_static_scts calls ngx_log_error */
             return NGX_CONF_ERROR;
@@ -233,10 +237,13 @@ int ngx_ssl_ct_ext_cb(SSL *s, unsigned int ext_type, const unsigned char **out,
 }
 #endif
 
-static ngx_ssl_ct_ext *ngx_ssl_ct_read_static_sct(ngx_conf_t *cf,
+static ngx_str_t *ngx_ssl_ct_read_static_sct(ngx_conf_t *cf,
     ngx_str_t *dir, u_char *file, size_t file_len,
-    ngx_ssl_ct_ext *sct_list) {
+    ngx_str_t **sct_out) {
+
     int ok = 0;
+
+    ngx_str_t *sct = NULL;
 
     /* join dir and file name */
     size_t path_len = dir->len + file_len + 2;
@@ -272,25 +279,31 @@ static ngx_ssl_ct_ext *ngx_ssl_ct_read_static_sct(ngx_conf_t *cf,
         goto out;
     }
 
-    const size_t len_pos = sct_list->len;
-    size_t sct_pos = len_pos + 2;
-
-    /* reserve two bytes for the length and sct_len bytes for the SCT. */
-    const size_t sct_and_len_size = sct_len + 2;
-
-    if (sct_and_len_size < sct_len ||
-        sct_list->len + sct_and_len_size < sct_list->len ||
-        sct_list->len + sct_and_len_size > NGX_SSL_CT_EXT_MAX_LEN) {
+    if (sct_len > NGX_SSL_CT_EXT_MAX_LEN) {
         ngx_log_error(NGX_LOG_EMERG, cf->log, 0,
-            "sct_list structure exceeds maximum length");
+            "sct structure exceeds maximum length");
         goto out;
     }
-    sct_list->len += sct_and_len_size;
+
+    sct = ngx_pcalloc(cf->pool, sizeof(ngx_str_t));
+    if(!sct) {
+        ngx_log_error(NGX_LOG_EMERG, cf->log, 0,
+            "Failed to allocate memory for SCT");
+        goto out;
+    }
+    sct->len = sct_len;
+    sct->data = ngx_pcalloc(cf->pool, sct->len);
+    if(!sct->data) {
+        ngx_log_error(NGX_LOG_EMERG, cf->log, 0,
+            "Failed to allocate memory for SCT buffer");
+        goto out;
+    }
 
     /* read the SCT from disk */
     size_t to_read = sct_len;
+    size_t sct_pos = 0;
     while (to_read > 0) {
-        ssize_t n = ngx_read_fd(fd, sct_list->buf + sct_pos, to_read);
+        ssize_t n = ngx_read_fd(fd, sct->data + sct_pos, to_read);
         if (n == NGX_FILE_ERROR) {
             ngx_log_error(NGX_LOG_EMERG, cf->log, ngx_errno,
                 ngx_read_fd_n " \"%s\" failed", path);
@@ -301,9 +314,7 @@ static ngx_ssl_ct_ext *ngx_ssl_ct_read_static_sct(ngx_conf_t *cf,
         sct_pos += n;
     }
 
-    /* fill in the length bytes and return */
-    sct_list->buf[len_pos] = sct_len >> 8;
-    sct_list->buf[len_pos + 1] = sct_len;
+    // We are done here
     ok = 1;
 
 out:
@@ -314,82 +325,200 @@ out:
     ngx_pfree(cf->pool, path);
 
     if (!ok) {
+        ngx_pfree(cf->pool, sct);
+        sct = NULL;
+
         return NULL;
     }
-    return sct_list;
+
+    if(sct_out) {
+        *sct_out = sct;
+    }
+    return sct;
 }
 
-ngx_ssl_ct_ext *ngx_ssl_ct_read_static_scts(ngx_conf_t *cf, ngx_str_t *path) {
-    /* resolve relative paths */
-    if (ngx_conf_full_name(cf->cycle, path, 1) != NGX_OK) {
-        ngx_log_error(NGX_LOG_EMERG, cf->log, ngx_errno,
-            "ngx_conf_full_name \"%V\" failed");
-        return NULL;
-    }
-
+ngx_ssl_ct_ext *ngx_ssl_ct_read_static_scts(ngx_conf_t *cf, ngx_ssl_ct_srv_conf_t *ctconf, X509 *cert)
+{
     /* allocate sct_list structure */
     ngx_ssl_ct_ext *sct_list = ngx_pcalloc(cf->pool, sizeof(*sct_list));
     if (!sct_list) {
         return NULL;
     }
+    sct_list->buf = ngx_pcalloc(cf->pool, NGX_SSL_CT_EXT_MAX_LEN);
+    sct_list->len = 0;
+    if(!sct_list->buf)
+    {
+        return NULL;
+    }
+
+    CT_POLICY_EVAL_CTX* cpectx = CT_POLICY_EVAL_CTX_new();
+    if(!cpectx) {
+        ngx_pfree(cf->pool, sct_list);
+        return NULL;
+    }
+
+    if(!CT_POLICY_EVAL_CTX_set1_cert(cpectx, cert)) {
+        CT_POLICY_EVAL_CTX_free(cpectx);
+        ngx_pfree(cf->pool, sct_list);
+        return NULL;
+    }
+
+    int ctlog_load;
+    CTLOG_STORE* ctlogs = CTLOG_STORE_new();
+    if(ctconf->ctlog) {
+        ctlog_load = CTLOG_STORE_load_file(ctlogs, ctconf->ctlog->data);
+    } else {
+        ctlog_load = CTLOG_STORE_load_default_file(ctlogs);
+    }
+    if(!ctlog_load) {
+        CT_POLICY_EVAL_CTX_free(cpectx);
+        CTLOG_STORE_free(ctlogs);
+        ngx_pfree(cf->pool, sct_list);
+        return NULL;
+    }
+
+    CT_POLICY_EVAL_CTX_set_shared_CTLOG_STORE(cpectx, ctlogs);
 
     /* reserve the first two bytes for the length */
     sct_list->len += 2;
 
-    /* open directory */
-    ngx_dir_t dir;
-    if (ngx_open_dir(path, &dir) != NGX_OK) {
-        ngx_log_error(NGX_LOG_EMERG, cf->log, ngx_errno,
-            ngx_open_dir_n " \"%V\" failed", path);
-        ngx_pfree(cf->pool, sct_list);
-        return NULL;
-    }
+    for(int i = 0; i < ctconf->sct_dirs->nelts; i++) {
+        /* the certificate linked list is stored in reverse order */
+        ngx_str_t *path = &ctconf->sct_dirs[ctconf->sct_dirs->nelts - i - 1];
 
-    /* iterate through all files */
-    for (;;) {
-        ngx_set_errno(NGX_ENOMOREFILES);
-
-        if (ngx_read_dir(&dir) != NGX_OK) {
-            ngx_err_t err = ngx_errno;
-
-            if (err == NGX_ENOMOREFILES) {
-                break;
-            } else {
-                ngx_log_error(NGX_LOG_EMERG, cf->log, err,
-                    ngx_read_dir_n " \"%V\" failed", path);
-                ngx_pfree(cf->pool, sct_list);
-                return NULL;
-            }
-        }
-
-        /* skip dotfiles */
-        size_t file_len = ngx_de_namelen(&dir);
-        u_char *file = ngx_de_name(&dir);
-        if (file[0] == '.') {
-            continue;
-        }
-
-        /* skip files unless the extension is .sct */
-        u_char *file_ext = (u_char *) ngx_strrchr(file, '.');
-        if (!file_ext || ngx_strcmp(file_ext, ".sct")) {
-            continue;
-        }
-
-        /* add the .sct file to the sct_list */
-        if (!ngx_ssl_ct_read_static_sct(cf, path, file, file_len, sct_list)) {
-            /* ngx_ssl_ct_read_static_sct calls ngx_log_error */
+        /* resolve relative paths */
+        if (ngx_conf_full_name(cf->cycle, path, 1) != NGX_OK) {
+            ngx_log_error(NGX_LOG_EMERG, cf->log, ngx_errno,
+                "ngx_conf_full_name \"%V\" failed");
+            CT_POLICY_EVAL_CTX_free(cpectx);
+            CTLOG_STORE_free(ctlogs);
             ngx_pfree(cf->pool, sct_list);
             return NULL;
         }
+
+        /* open directory */
+        ngx_dir_t dir;
+        if (ngx_open_dir(path, &dir) != NGX_OK) {
+            ngx_log_error(NGX_LOG_EMERG, cf->log, ngx_errno,
+                ngx_open_dir_n " \"%V\" failed", path);
+            CT_POLICY_EVAL_CTX_free(cpectx);
+            CTLOG_STORE_free(ctlogs);
+            ngx_pfree(cf->pool, sct_list);
+            return NULL;
+        }
+
+        /* iterate through all files */
+        for (;;) {
+            ngx_set_errno(NGX_ENOMOREFILES);
+
+            if (ngx_read_dir(&dir) != NGX_OK) {
+                ngx_err_t err = ngx_errno;
+
+                if (err == NGX_ENOMOREFILES) {
+                    break;
+                } else {
+                    ngx_log_error(NGX_LOG_EMERG, cf->log, err,
+                        ngx_read_dir_n " \"%V\" failed", path);
+
+                    CT_POLICY_EVAL_CTX_free(cpectx);
+                    CTLOG_STORE_free(ctlogs);
+                    ngx_pfree(cf->pool, sct_list);
+                    return NULL;
+                }
+            }
+
+            /* skip dotfiles */
+            size_t file_len = ngx_de_namelen(&dir);
+            u_char *file = ngx_de_name(&dir);
+            if (file[0] == '.') {
+                continue;
+            }
+
+            /* skip files unless the extension is .sct */
+            u_char *file_ext = (u_char *) ngx_strrchr(file, '.');
+            if (!file_ext || ngx_strcmp(file_ext, ".sct")) {
+                continue;
+            }
+
+            /* add the .sct file to the sct_list */
+            ngx_str_t *sct_buf = NULL;
+            if (!ngx_ssl_ct_read_static_sct(cf, path, file, file_len, &sct_buf)) {
+                /* ngx_ssl_ct_read_static_sct calls ngx_log_error */
+                if(sct_buf) {
+                    ngx_pfree(cf->pool, sct_buf);
+                }
+
+                CT_POLICY_EVAL_CTX_free(cpectx);
+                CTLOG_STORE_free(ctlogs);
+                ngx_pfree(cf->pool, sct_list);
+
+                return NULL;
+            }
+
+#if OPENSSL_VERSION_NUMBER > 0x01010100
+
+            SCT* ossl_sct_buf = o2i_SCT(NULL, sct_buf->data, sct_buf->len);
+
+            if(!ossl_sct_buf) {
+                ngx_pfree(cf->pool, sct_buf);
+                goto skip_this;
+            }
+
+            int sct_status = SCT_validate(ossl_sct_buf, cpectx);
+
+            SCT_free(ossl_sct_buf);
+
+            if(1 != sct_status) {
+                goto skip_this;
+            }
+
+#endif
+
+            //We will use this SCT
+            {
+                //Check for enough space left in the extension buffer
+                if(NGX_SSL_CT_EXT_MAX_LEN - sct_list->len -2 < sct_buf->len) {
+                    ngx_log_error(NGX_LOG_EMERG, cf->log, 0,
+                        "SCT structure too large");
+
+                    CT_POLICY_EVAL_CTX_free(cpectx);
+                    CTLOG_STORE_free(ctlogs);
+                    ngx_pfree(cf->pool, sct_list);
+
+                    return NULL;
+                }
+
+                u_char* sct_write = sct_list.buf + sct_list.len;
+                sct_write[0] = sct_buf->len >> 8;
+                sct_write[1] = sct_buf->len;
+
+                sct_write += 2;
+
+                ngx_memcpy(sct_write, sct_buf->data, sct_buf->len);
+
+                sct_list->len += sct_buf->len;
+            }
+
+skip_this:
+            ngx_pfree(cf->pool, sct_buf);
+        }
+
+        /* close directory */
+        if (ngx_close_dir(&dir) != NGX_OK) {
+            ngx_log_error(NGX_LOG_EMERG, cf->log, ngx_errno,
+                ngx_close_dir_n " \"%V\" failed", path);
+
+            CT_POLICY_EVAL_CTX_free(cpectx);
+            CTLOG_STORE_free(ctlogs);
+            ngx_pfree(cf->pool, sct_list);
+
+            return NULL;
+        }
+
     }
 
-    /* close directory */
-    if (ngx_close_dir(&dir) != NGX_OK) {
-        ngx_log_error(NGX_LOG_EMERG, cf->log, ngx_errno,
-            ngx_close_dir_n " \"%V\" failed", path);
-        ngx_pfree(cf->pool, sct_list);
-        return NULL;
-    }
+    CT_POLICY_EVAL_CTX_free(cpectx);
+    CTLOG_STORE_free(ctlogs);
 
     /* fill in the length bytes and return */
     size_t sct_list_len = sct_list->len - 2;
@@ -399,5 +528,6 @@ ngx_ssl_ct_ext *ngx_ssl_ct_read_static_scts(ngx_conf_t *cf, ngx_str_t *path) {
     } else {
         sct_list->len = 0;
     }
+
     return sct_list;
 }
