@@ -26,6 +26,10 @@ LibreSSL is **not** supported as it doesn't provide either of the functions used
 to add the `signed_certificate_timestamp` extension to the response
 (`SSL_CTX_add_server_custom_ext` and `SSL_CTX_set_signed_cert_timestamp_list`).
 
+OpenSSL versions between 1.1.0 and 1.1.0e inclusive contain a [bug][openssl-bug]
+that prevents this module from working with non-`default_server` `server`
+blocks. The bug is fixed in OpenSSL 1.1.0f.
+
 Configuration
 -------------
 
@@ -80,3 +84,4 @@ information and licensing terms.
 [apache]: https://httpd.apache.org/docs/trunk/mod/mod_ssl_ct.html
 [ct-submit]: https://github.com/grahamedgecombe/ct-submit
 [boringssl]: https://boringssl.googlesource.com/boringssl/+/4fac72e638c896c9fa30f5c6cd2fd7246f28f49e%5E!/
+[openssl-bug]: https://github.com/openssl/openssl/issues/2180
