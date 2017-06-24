@@ -23,6 +23,7 @@ if test -n "$ngx_module_link"; then
     ngx_module_srcs="$ngx_addon_dir/ngx_ssl_ct_module.c"
     ngx_module_libs=OPENSSL
     . auto/module
+    have=NGX_SSL_CT . auto/have
 
     if [ $HTTP = YES ] && [ $HTTP_SSL = YES ]; then
         ngx_module_type=HTTP
@@ -32,6 +33,7 @@ if test -n "$ngx_module_link"; then
         ngx_module_libs=OPENSSL
         ngx_module_order="ngx_http_ssl_module ngx_ssl_ct_module $ngx_module_name"
         . auto/module
+        have=NGX_HTTP_SSL_CT . auto/have
 
         found_any=yes
     fi
@@ -44,6 +46,7 @@ if test -n "$ngx_module_link"; then
         ngx_module_libs=OPENSSL
         ngx_module_order="ngx_mail_ssl_module ngx_ssl_ct_module $ngx_module_name"
         . auto/module
+        have=NGX_MAIL_SSL_CT . auto/have
 
         found_any=yes
     fi
@@ -56,6 +59,7 @@ if test -n "$ngx_module_link"; then
         ngx_module_libs=OPENSSL
         ngx_module_order="ngx_stream_ssl_module ngx_ssl_ct_module $ngx_module_name"
         . auto/module
+        have=NGX_STREAM_SSL_CT . auto/have
 
         found_any=yes
     fi
