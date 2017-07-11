@@ -383,7 +383,7 @@ ngx_ssl_ct_ext *ngx_ssl_ct_read_static_scts(ngx_conf_t *cf, ngx_ssl_ct_srv_conf_
 
     for(size_t i = 0; i < ctconf->sct_dirs->nelts; i++) {
         /* the certificate linked list is stored in reverse order */
-        ngx_str_t *path = (ngx_str_t *)&ctconf->sct_dirs[ctconf->sct_dirs->nelts - i - 1];
+        ngx_str_t *path = ((ngx_str_t **)ctconf->sct_dirs->elts)[ctconf->sct_dirs->nelts - i - 1];
 
         /* resolve relative paths */
         if (ngx_conf_full_name(cf->cycle, path, 1) != NGX_OK) {
