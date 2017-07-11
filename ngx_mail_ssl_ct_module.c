@@ -47,6 +47,14 @@ static ngx_command_t ngx_mail_ssl_ct_commands[] = {
         offsetof(ngx_ssl_ct_srv_conf_t, sct_dirs),
         NULL
     },
+    {
+        ngx_string("ssl_ct_log"),
+        NGX_HTTP_MAIN_CONF | NGX_HTTP_SRV_CONF | NGX_CONF_TAKE1,
+        &ngx_conf_set_str_slot,
+        NGX_HTTP_SRV_CONF_OFFSET,
+        offsetof(ngx_ssl_ct_srv_conf_t, ctlog),
+        NULL
+    },
     ngx_null_command
 };
 

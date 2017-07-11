@@ -70,6 +70,7 @@ void *ngx_ssl_ct_create_srv_conf(ngx_conf_t *cf) {
     }
 
     conf->enable = NGX_CONF_UNSET;
+    conf->ctlog = NGX_CONF_UNSET_PTR;
     conf->sct_dirs = NGX_CONF_UNSET_PTR;
 
     return conf;
