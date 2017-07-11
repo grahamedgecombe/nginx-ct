@@ -19,13 +19,14 @@
 #include <openssl/ossl_typ.h>
 #include <openssl/x509.h>
 #include <openssl/ct.h>
+#include <openssl/ssl.h>
 
 static int ngx_ssl_ct_sct_list_index;
 
 static void *ngx_ssl_ct_create_conf(ngx_cycle_t *cycle);
-static ngx_ssl_ct_ext *ngx_ssl_ct_read_static_sct(ngx_conf_t *cf,
+static ngx_str_t *ngx_ssl_ct_read_static_sct(ngx_conf_t *cf,
     ngx_str_t *dir, u_char *file, size_t file_len,
-    ngx_ssl_ct_ext *sct_list);
+    ngx_str_t **sct_out);
 
 static ngx_core_module_t ngx_ssl_ct_module_ctx = {
     ngx_string("ssl_ct"),
@@ -112,13 +113,13 @@ char *ngx_ssl_ct_merge_srv_conf(ngx_conf_t *cf, void *parent, void *child,
     }
 
     /* loop through all the certs/SCT dirs */
-    ngx_str_t *sct_dirs = conf->sct_dirs->elts;
+    //ngx_str_t *sct_dirs = conf->sct_dirs->elts;
     X509 *cert = SSL_CTX_get_ex_data(ssl_ctx, ngx_ssl_certificate_index);
 
     ngx_uint_t i;
     for (i = 0; i < certificates->nelts; i++) {
         /* the certificate linked list is stored in reverse order */
-        ngx_str_t *sct_dir = &sct_dirs[sct_dir_count - i - 1];
+        //ngx_str_t *sct_dir = &sct_dirs[sct_dir_count - i - 1];
 
         /* read the .sct files for this cert */
         ngx_ssl_ct_ext *sct_list = ngx_ssl_ct_read_static_scts(cf, conf, cert);
@@ -344,7 +345,7 @@ ngx_ssl_ct_ext *ngx_ssl_ct_read_static_scts(ngx_conf_t *cf, ngx_ssl_ct_srv_conf_
     if (!sct_list) {
         return NULL;
     }
-    sct_list->buf = ngx_pcalloc(cf->pool, NGX_SSL_CT_EXT_MAX_LEN);
+    //sct_list->buf = ngx_pcalloc(cf->pool, NGX_SSL_CT_EXT_MAX_LEN);
     sct_list->len = 0;
     if(!sct_list->buf)
     {
@@ -366,7 +367,7 @@ ngx_ssl_ct_ext *ngx_ssl_ct_read_static_scts(ngx_conf_t *cf, ngx_ssl_ct_srv_conf_
     int ctlog_load;
     CTLOG_STORE* ctlogs = CTLOG_STORE_new();
     if(ctconf->ctlog) {
-        ctlog_load = CTLOG_STORE_load_file(ctlogs, ctconf->ctlog->data);
+        ctlog_load = CTLOG_STORE_load_file(ctlogs, (const char *)ctconf->ctlog->data);
     } else {
         ctlog_load = CTLOG_STORE_load_default_file(ctlogs);
     }
@@ -382,9 +383,9 @@ ngx_ssl_ct_ext *ngx_ssl_ct_read_static_scts(ngx_conf_t *cf, ngx_ssl_ct_srv_conf_
     /* reserve the first two bytes for the length */
     sct_list->len += 2;
 
-    for(int i = 0; i < ctconf->sct_dirs->nelts; i++) {
+    for(size_t i = 0; i < ctconf->sct_dirs->nelts; i++) {
         /* the certificate linked list is stored in reverse order */
-        ngx_str_t *path = &ctconf->sct_dirs[ctconf->sct_dirs->nelts - i - 1];
+        ngx_str_t *path = (ngx_str_t *)&ctconf->sct_dirs[ctconf->sct_dirs->nelts - i - 1];
 
         /* resolve relative paths */
         if (ngx_conf_full_name(cf->cycle, path, 1) != NGX_OK) {
@@ -457,7 +458,7 @@ ngx_ssl_ct_ext *ngx_ssl_ct_read_static_scts(ngx_conf_t *cf, ngx_ssl_ct_srv_conf_
 
 #if OPENSSL_VERSION_NUMBER > 0x01010100
 
-            SCT* ossl_sct_buf = o2i_SCT(NULL, sct_buf->data, sct_buf->len);
+            SCT* ossl_sct_buf = o2i_SCT(NULL, (const u_char **)&sct_buf->data, sct_buf->len);
 
             if(!ossl_sct_buf) {
                 ngx_pfree(cf->pool, sct_buf);
@@ -488,7 +489,7 @@ ngx_ssl_ct_ext *ngx_ssl_ct_read_static_scts(ngx_conf_t *cf, ngx_ssl_ct_srv_conf_
                     return NULL;
                 }
 
-                u_char* sct_write = sct_list.buf + sct_list.len;
+                u_char* sct_write = sct_list->buf + sct_list->len;
                 sct_write[0] = sct_buf->len >> 8;
                 sct_write[1] = sct_buf->len;
 
