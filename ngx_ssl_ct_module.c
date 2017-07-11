@@ -367,7 +367,7 @@ ngx_ssl_ct_ext *ngx_ssl_ct_read_static_scts(ngx_conf_t *cf, ngx_ssl_ct_srv_conf_
 
     int ctlog_load;
     CTLOG_STORE* ctlogs = CTLOG_STORE_new();
-    if(ctconf->ctlog) {
+    if(ctconf->ctlog != NGX_CONF_UNSET_PTR) {
         ctlog_load = CTLOG_STORE_load_file(ctlogs, (const char *)ctconf->ctlog->data);
     } else {
         ctlog_load = CTLOG_STORE_load_default_file(ctlogs);
