@@ -86,6 +86,11 @@ char *ngx_ssl_ct_merge_srv_conf(ngx_conf_t *cf, void *parent, void *child,
     ngx_conf_merge_value(conf->enable, prev->enable, 0);
     ngx_conf_merge_ptr_value(conf->sct_dirs, prev->sct_dirs, NULL);
 
+    ngx_conf_merge_str_value(conf->ctlog, prev->ctlog, "");
+    if(!conf->ctlog.len) {
+        conf->ctlog.data = NULL;
+    }
+
     /* validate config */
     if (conf->enable) {
         if (!conf->sct_dirs) {
