@@ -105,18 +105,9 @@ char *ngx_ssl_ct_merge_srv_conf(ngx_conf_t *cf, void *parent, void *child,
 
     /* check if SSL is enabled */
     if (!ssl_ctx) {
-        ngx_log_error(NGX_LOG_EMERG, cf->log, 0,
-            "\"ssl_ct\" can only be enabled if ssl is enabled");
-        return NGX_CONF_ERROR;
-    }
-
-    /* check we have one SCT dir for each certificate */
-    ngx_uint_t sct_dir_count = conf->sct_dirs->nelts;
-    if (sct_dir_count != certificates->nelts) {
-        ngx_log_error(NGX_LOG_EMERG, cf->log, 0,
-            "there must be exactly one \"ssl_ct_static_scts\" directive for "
-            "each \"ssl_certificate\" directive");
-        return NGX_CONF_ERROR;
+        ngx_log_error(NGX_LOG_WARN, cf->log, 0,
+            "\"ssl_ct\" is only processed if ssl is enabled");
+        return NGX_CONF_OK;
     }
 
     /* loop through all the certs/SCT dirs */
