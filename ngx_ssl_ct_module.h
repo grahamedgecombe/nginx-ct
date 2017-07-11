@@ -27,7 +27,7 @@
 typedef struct {
     ngx_flag_t   enable;
     ngx_array_t *sct_dirs;
-    ngx_str_t   *ctlog;
+    ngx_str_t    ctlog;
 } ngx_ssl_ct_srv_conf_t;
 
 typedef struct {

@@ -70,7 +70,8 @@ void *ngx_ssl_ct_create_srv_conf(ngx_conf_t *cf) {
     }
 
     conf->enable = NGX_CONF_UNSET;
-    conf->ctlog = NGX_CONF_UNSET_PTR;
+    conf->ctlog.data = NULL;
+    conf->ctlog.len = 0;
     conf->sct_dirs = NGX_CONF_UNSET_PTR;
 
     return conf;
@@ -367,8 +368,8 @@ ngx_ssl_ct_ext *ngx_ssl_ct_read_static_scts(ngx_conf_t *cf, ngx_ssl_ct_srv_conf_
 
     int ctlog_load;
     CTLOG_STORE* ctlogs = CTLOG_STORE_new();
-    if(ctconf->ctlog != NGX_CONF_UNSET_PTR) {
-        ctlog_load = CTLOG_STORE_load_file(ctlogs, (const char *)ctconf->ctlog->data);
+    if(ctconf->ctlog.data) {
+        ctlog_load = CTLOG_STORE_load_file(ctlogs, (const char *)ctconf->ctlog.data);
     } else {
         ctlog_load = CTLOG_STORE_load_default_file(ctlogs);
     }
