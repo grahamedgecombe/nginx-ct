@@ -248,6 +248,8 @@ static ngx_str_t *ngx_ssl_ct_read_static_sct(ngx_conf_t *cf,
     size_t path_len = dir->len + file_len + 2;
     u_char *path = ngx_pcalloc(cf->pool, path_len);
     if (path == NULL) {
+        ngx_log_error(NGX_LOG_WARN, cf->log, 0,
+            "Could not join filename");
         return NULL;
     }
 
@@ -274,13 +276,15 @@ static ngx_str_t *ngx_ssl_ct_read_static_sct(ngx_conf_t *cf,
 
     const size_t sct_len = ngx_file_size(&stat);
     if (sct_len == 0) {
+        ngx_log_error(NGX_LOG_WARN, cf->log, 0,
+            "Found empty SCT in file %s", path);
         ok = 1;
         goto out;
     }
 
     if (sct_len > NGX_SSL_CT_EXT_MAX_LEN) {
         ngx_log_error(NGX_LOG_EMERG, cf->log, 0,
-            "sct structure exceeds maximum length");
+            "SCT structure exceeds maximum length");
         goto out;
     }
 
@@ -321,6 +325,11 @@ out:
         ngx_log_error(NGX_LOG_EMERG, cf->log, ngx_errno,
             ngx_close_file_n " \"%s\" failed", path);
     }
+
+    if (!ok) {
+        ngx_log_error(NGX_LOG_WARN, cf->log, 0,
+            "SCT in %s was not valid", path);
+    }
     ngx_pfree(cf->pool, path);
 
     if (!ok) {
@@ -341,6 +350,8 @@ ngx_ssl_ct_ext *ngx_ssl_ct_read_static_scts(ngx_conf_t *cf, ngx_ssl_ct_srv_conf_
     /* allocate sct_list structure */
     ngx_ssl_ct_ext *sct_list = ngx_pcalloc(cf->pool, sizeof(*sct_list));
     if (!sct_list) {
+        ngx_log_error(NGX_LOG_WARN, cf->log, 0,
+            "Could not allocate SCT list structure");
         return NULL;
     }
     //sct_list->buf = ngx_pcalloc(cf->pool, NGX_SSL_CT_EXT_MAX_LEN);
@@ -352,11 +363,15 @@ ngx_ssl_ct_ext *ngx_ssl_ct_read_static_scts(ngx_conf_t *cf, ngx_ssl_ct_srv_conf_
 
     CT_POLICY_EVAL_CTX* cpectx = CT_POLICY_EVAL_CTX_new();
     if(!cpectx) {
+        ngx_log_error(NGX_LOG_WARN, cf->log, 0,
+            "Could not allocate SCT Policy Evaluation Context");
         ngx_pfree(cf->pool, sct_list);
         return NULL;
     }
 
     if(!CT_POLICY_EVAL_CTX_set1_cert(cpectx, cert)) {
+        ngx_log_error(NGX_LOG_WARN, cf->log, 0,
+            "Could not set certificate for SCT Policy Context");
         CT_POLICY_EVAL_CTX_free(cpectx);
         ngx_pfree(cf->pool, sct_list);
         return NULL;
@@ -366,10 +381,17 @@ ngx_ssl_ct_ext *ngx_ssl_ct_read_static_scts(ngx_conf_t *cf, ngx_ssl_ct_srv_conf_
     CTLOG_STORE* ctlogs = CTLOG_STORE_new();
     if(ctconf->ctlog.data) {
         ctlog_load = CTLOG_STORE_load_file(ctlogs, (const char *)ctconf->ctlog.data);
+        ngx_log_error(NGX_LOG_WARN, cf->log, 0,
+            "CTLOG_STORE loaded from file: %s", ctconf->ctlog.data);
     } else {
         ctlog_load = CTLOG_STORE_load_default_file(ctlogs);
+        ngx_log_error(NGX_LOG_WARN, cf->log, 0,
+            "CTLOG_STORE loaded from system default location");
     }
     if(!ctlog_load) {
+        ngx_log_error(NGX_LOG_WARN, cf->log, 0,
+            "Failed to load CT Log information file");
+
         CT_POLICY_EVAL_CTX_free(cpectx);
         CTLOG_STORE_free(ctlogs);
         ngx_pfree(cf->pool, sct_list);
@@ -475,6 +497,9 @@ ngx_ssl_ct_ext *ngx_ssl_ct_read_static_scts(ngx_conf_t *cf, ngx_ssl_ct_srv_conf_
 
             //We will use this SCT
             {
+                ngx_log_error(NGX_LOG_INFO, cf->log, 0,
+                    "Found some SCT for inclusion into the handshake");
+
                 //Check for enough space left in the extension buffer
                 if(NGX_SSL_CT_EXT_MAX_LEN - sct_list->len -2 < sct_buf->len) {
                     ngx_log_error(NGX_LOG_EMERG, cf->log, 0,
@@ -525,6 +550,8 @@ skip_this:
         sct_list->buf[0] = sct_list_len >> 8;
         sct_list->buf[1] = sct_list_len;
     } else {
+        ngx_log_error(NGX_LOG_WARN, cf->log, 0,
+            "No suiteable SCT found in configured directories");
         sct_list->len = 0;
     }
 
