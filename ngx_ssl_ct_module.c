@@ -354,12 +354,7 @@ ngx_ssl_ct_ext *ngx_ssl_ct_read_static_scts(ngx_conf_t *cf, ngx_ssl_ct_srv_conf_
             "Could not allocate SCT list structure");
         return NULL;
     }
-    //sct_list->buf = ngx_pcalloc(cf->pool, NGX_SSL_CT_EXT_MAX_LEN);
     sct_list->len = 0;
-    if(!sct_list->buf)
-    {
-        return NULL;
-    }
 
     CT_POLICY_EVAL_CTX* cpectx = CT_POLICY_EVAL_CTX_new();
     if(!cpectx) {
