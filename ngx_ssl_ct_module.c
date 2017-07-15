@@ -16,6 +16,8 @@
 
 #include "ngx_ssl_ct_module.h"
 
+#include <time.h>
+
 #include <openssl/ossl_typ.h>
 #include <openssl/x509.h>
 #include <openssl/ct.h>
@@ -394,6 +396,7 @@ ngx_ssl_ct_ext *ngx_ssl_ct_read_static_scts(ngx_conf_t *cf, ngx_ssl_ct_srv_conf_
     }
 
     CT_POLICY_EVAL_CTX_set_shared_CTLOG_STORE(cpectx, ctlogs);
+    CT_POLICY_EVAL_CTX_set_time(cpectx, (time(NULL) + 300ULL) * 1000ULL);
 
     /* reserve the first two bytes for the length */
     sct_list->len += 2;
