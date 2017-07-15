@@ -382,11 +382,11 @@ ngx_ssl_ct_ext *ngx_ssl_ct_read_static_scts(ngx_conf_t *cf, ngx_ssl_ct_srv_conf_
     CTLOG_STORE* ctlogs = CTLOG_STORE_new();
     if(ctconf->ctlog.data) {
         ctlog_load = CTLOG_STORE_load_file(ctlogs, (const char *)ctconf->ctlog.data);
-        ngx_log_error(NGX_LOG_WARN, cf->log, 0,
+        ngx_log_error(NGX_LOG_INFO, cf->log, 0,
             "CTLOG_STORE loaded from file: %s", ctconf->ctlog.data);
     } else {
         ctlog_load = CTLOG_STORE_load_default_file(ctlogs);
-        ngx_log_error(NGX_LOG_WARN, cf->log, 0,
+        ngx_log_error(NGX_LOG_INFO, cf->log, 0,
             "CTLOG_STORE loaded from system default location");
     }
     if(1 != ctlog_load) {
@@ -503,8 +503,15 @@ ngx_ssl_ct_ext *ngx_ssl_ct_read_static_scts(ngx_conf_t *cf, ngx_ssl_ct_srv_conf_
             int sct_status = SCT_get_validation_status(ossl_sct_buf);
 
             if(SCT_VALIDATION_STATUS_VALID != sct_status) {
-                ngx_log_error(NGX_LOG_INFO, cf->log, 0,
+                ngx_log_error(NGX_LOG_DEBUG, cf->log, 0,
                     "SCT validation on certificate %s returned %d for file %s", subj, sct_status, file);
+
+                unsigned long ossl_error;
+                while((ossl_error = ERR_get_error())) {
+                    char* ossl_errstr = ERR_error_string(ossl_error, NULL);
+                    ngx_log_error(NGX_LOG_DEBUG, cf->log, 0,
+                        "OpenSSL: %s", ossl_errstr);
+                }
 
                 goto skip_this;
             }
