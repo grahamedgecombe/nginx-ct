@@ -130,12 +130,21 @@ char *ngx_ssl_ct_merge_srv_conf(ngx_conf_t *cf, void *parent, void *child,
 
         if (sct_list->len == 0) {
             ngx_pfree(cf->pool, sct_list);
+            ngx_log_error(NGX_LOG_DEBUG, cf->log, 0,
+                "No SCTs to attach for this certificate");
             goto next;
         }
 
 #ifndef OPENSSL_IS_BORINGSSL
         /* associate the sct_list with the cert */
         X509_set_ex_data(cert, ngx_ssl_ct_sct_list_index, sct_list);
+
+        unsigned long ossl_error;
+        while((ossl_error = ERR_get_error())) {
+            char* ossl_errstr = ERR_error_string(ossl_error, NULL);
+            ngx_log_error(NGX_LOG_DEBUG, cf->log, 0,
+                "OpenSSL: %s", ossl_errstr);
+        }
 #else
         if (SSL_CTX_set_signed_cert_timestamp_list(ssl_ctx, sct_list->buf,
             sct_list->len) == 0) {
@@ -350,7 +359,7 @@ out:
 ngx_ssl_ct_ext *ngx_ssl_ct_read_static_scts(ngx_conf_t *cf, ngx_ssl_ct_srv_conf_t *ctconf, X509 *cert)
 {
     char *subj = X509_NAME_oneline(X509_get_subject_name(cert), NULL, 0);
-    ngx_log_error(NGX_LOG_WARN, cf->log, 0,
+    ngx_log_error(NGX_LOG_INFO, cf->log, 0,
         "Looking up certificates for: %s", subj);
 
     /* allocate sct_list structure */
@@ -576,7 +585,7 @@ skip_this:
         sct_list->buf[1] = sct_list_len;
     } else {
         ngx_log_error(NGX_LOG_WARN, cf->log, 0,
-            "No suiteable SCT found in configured directories");
+            "No suiteable SCT found in configured directories for %s", subj);
         sct_list->len = 0;
     }
 
