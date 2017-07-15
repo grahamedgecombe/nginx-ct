@@ -536,7 +536,7 @@ ngx_ssl_ct_ext *ngx_ssl_ct_read_static_scts(ngx_conf_t *cf, ngx_ssl_ct_srv_conf_
 
                 ngx_memcpy(sct_write, sct_buf->data, sct_buf->len);
 
-                sct_list->len += sct_buf->len;
+                sct_list->len += sct_buf->len + 2;
             }
 
 skip_this:
