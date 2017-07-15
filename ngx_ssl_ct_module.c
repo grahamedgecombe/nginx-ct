@@ -389,7 +389,7 @@ ngx_ssl_ct_ext *ngx_ssl_ct_read_static_scts(ngx_conf_t *cf, ngx_ssl_ct_srv_conf_
         ngx_log_error(NGX_LOG_WARN, cf->log, 0,
             "CTLOG_STORE loaded from system default location");
     }
-    if(!ctlog_load) {
+    if(1 != ctlog_load) {
         ngx_log_error(NGX_LOG_WARN, cf->log, 0,
             "Failed to load CT Log information file");
 
@@ -517,7 +517,7 @@ ngx_ssl_ct_ext *ngx_ssl_ct_read_static_scts(ngx_conf_t *cf, ngx_ssl_ct_srv_conf_
                     "Found some SCT for inclusion into the handshake");
 
                 //Check for enough space left in the extension buffer
-                if(NGX_SSL_CT_EXT_MAX_LEN - sct_list->len -2 < sct_buf->len) {
+                if(NGX_SSL_CT_EXT_MAX_LEN - sct_list->len - 2 < sct_buf->len) {
                     ngx_log_error(NGX_LOG_EMERG, cf->log, 0,
                         "SCT structure too large");
 
