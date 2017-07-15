@@ -179,14 +179,14 @@ next:
                 | SSL_EXT_TLS1_2_SERVER_HELLO
                 | SSL_EXT_TLS1_3_CERTIFICATE;
     if (SSL_CTX_add_custom_ext(ssl_ctx, NGX_SSL_CT_EXT, context,
-        &ngx_ssl_ct_ext_cb, NULL, NULL, NULL, NULL) == 0) {
+        &ngx_ssl_ct_ext_cb, NULL, NULL, NULL, NULL) != 1) {
         ngx_log_error(NGX_LOG_EMERG, cf->log, 0,
             "SSL_CTX_add_custom_ext failed");
         return NGX_CONF_ERROR;
     }
 #  else
     if (SSL_CTX_add_server_custom_ext(ssl_ctx, NGX_SSL_CT_EXT,
-        &ngx_ssl_ct_ext_cb, NULL, NULL, NULL, NULL) == 0) {
+        &ngx_ssl_ct_ext_cb, NULL, NULL, NULL, NULL) != 1) {
         ngx_log_error(NGX_LOG_EMERG, cf->log, 0,
             "SSL_CTX_add_server_custom_ext failed");
         return NGX_CONF_ERROR;
@@ -237,7 +237,7 @@ int ngx_ssl_ct_ext_cb(SSL *s, unsigned int ext_type, const unsigned char **out,
     /* get sct_list for the cert OpenSSL chose to use for this connection */
     ngx_ssl_ct_ext *sct_list = X509_get_ex_data(x, ngx_ssl_ct_sct_list_index);
 
-    if (sct_list) {
+    if (sct_list && sct_list->len) {
         *out    = sct_list->buf;
         *outlen = sct_list->len;
         return 1;
@@ -411,9 +411,6 @@ ngx_ssl_ct_ext *ngx_ssl_ct_read_static_scts(ngx_conf_t *cf, ngx_ssl_ct_srv_conf_
     CT_POLICY_EVAL_CTX_set_shared_CTLOG_STORE(cpectx, ctlogs);
     CT_POLICY_EVAL_CTX_set_time(cpectx, (time(NULL) + 300ULL) * 1000ULL);
 
-    /* reserve the first two bytes for the length */
-    sct_list->len += 2;
-
     for(size_t i = 0; i < ctconf->sct_dirs->nelts; i++) {
         /* the certificate linked list is stored in reverse order */
         ngx_str_t *path = &((ngx_str_t *)ctconf->sct_dirs->elts)[ctconf->sct_dirs->nelts - i - 1];
@@ -579,11 +576,8 @@ skip_this:
     CTLOG_STORE_free(ctlogs);
 
     /* fill in the length bytes and return */
-    size_t sct_list_len = sct_list->len - 2;
-    if (sct_list_len > 0) {
-        sct_list->buf[0] = sct_list_len >> 8;
-        sct_list->buf[1] = sct_list_len;
-    } else {
+    size_t sct_list_len = sct_list->len;
+    if (sct_list_len < 1) {
         ngx_log_error(NGX_LOG_WARN, cf->log, 0,
             "No suiteable SCT found in configured directories for %s", subj);
         sct_list->len = 0;
