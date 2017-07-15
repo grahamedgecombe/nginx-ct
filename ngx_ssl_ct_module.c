@@ -480,18 +480,32 @@ ngx_ssl_ct_ext *ngx_ssl_ct_read_static_scts(ngx_conf_t *cf, ngx_ssl_ct_srv_conf_
 
 #if OPENSSL_VERSION_NUMBER > 0x01010100
 
-            SCT* ossl_sct_buf = o2i_SCT(NULL, (const u_char **)&sct_buf->data, sct_buf->len);
+            const u_char* sct_buf_ptr = (const u_char *)sct_buf->data;
+            SCT* ossl_sct_buf = o2i_SCT(NULL, &sct_buf_ptr, sct_buf->len);
 
             if(!ossl_sct_buf) {
+                ngx_log_error(NGX_LOG_WARN, cf->log, 0,
+                    "Could not parse SCT file %s", file);
+
                 ngx_pfree(cf->pool, sct_buf);
                 goto skip_this;
             }
 
-            int sct_status = SCT_validate(ossl_sct_buf, cpectx);
+            SCT_set_log_entry_type(ossl_sct_buf, CT_LOG_ENTRY_TYPE_X509);
 
-            SCT_free(ossl_sct_buf);
+            if(-1 == SCT_validate(ossl_sct_buf, cpectx)) {
+                ngx_log_error(NGX_LOG_WARN, cf->log, 0,
+                    "Validation of SCT file %s returned an internal error", file);
 
-            if(1 != sct_status) {
+                goto skip_this;
+            }
+
+            int sct_status = SCT_get_validation_status(ossl_sct_buf);
+
+            if(SCT_VALIDATION_STATUS_VALID != sct_status) {
+                ngx_log_error(NGX_LOG_INFO, cf->log, 0,
+                    "SCT validation on certificate %s returned %d for file %s", subj, sct_status, file);
+
                 goto skip_this;
             }
 
@@ -526,6 +540,8 @@ ngx_ssl_ct_ext *ngx_ssl_ct_read_static_scts(ngx_conf_t *cf, ngx_ssl_ct_srv_conf_
             }
 
 skip_this:
+            SCT_free(ossl_sct_buf);
+
             ngx_pfree(cf->pool, sct_buf);
         }
 
