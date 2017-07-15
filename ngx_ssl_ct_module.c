@@ -349,6 +349,10 @@ out:
 
 ngx_ssl_ct_ext *ngx_ssl_ct_read_static_scts(ngx_conf_t *cf, ngx_ssl_ct_srv_conf_t *ctconf, X509 *cert)
 {
+    char *subj = X509_NAME_oneline(X509_get_subject_name(cert), NULL, 0);
+    ngx_log_error(NGX_LOG_WARN, cf->log, 0,
+        "Looking up certificates for: %s", subj);
+
     /* allocate sct_list structure */
     ngx_ssl_ct_ext *sct_list = ngx_pcalloc(cf->pool, sizeof(*sct_list));
     if (!sct_list) {
@@ -552,6 +556,8 @@ skip_this:
             "No suiteable SCT found in configured directories");
         sct_list->len = 0;
     }
+
+    OPENSSL_free(subj);
 
     return sct_list;
 }
