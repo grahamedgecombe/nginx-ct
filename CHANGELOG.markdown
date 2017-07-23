@@ -1,6 +1,8 @@
 # UNRELEASED
 
 * Add TLS 1.3 support.
+* Build CT modules if the mail/stream modules are dynamically linked.
+* Add module name macros.
 
 # 1.3.2 (30 November 2016)
 
